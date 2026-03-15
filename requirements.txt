@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+python-dotenv
+python-multipart
+pydantic
+motor
+pymupdf
+pdf2image
+pytesseract
+groq
+mlx-lm
+fhir.resources
+rapidfuzz
