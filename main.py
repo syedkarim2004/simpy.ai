@@ -5,7 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from pydantic import BaseModel
 import uuid
-
+import io
+from PIL import Image
+import pytesseract
 # Import database and services
 from db import connect_db, get_db
 from services.parser import extract_text
@@ -58,26 +60,25 @@ async def ingest_file(file: UploadFile = File(...)):
     # Read the file bytes
     file_bytes = await file.read()
     
-    # Extract text using parser service
-    raw_text = await extract_text(file_bytes)
+    filename_lower = file.filename.lower()
     
-    # Detect the source from how much text was extracted
-    # The parser currently prints '📄 Digital PDF' or '🔍 OCR used', 
-    # but the text extraction length is a good proxy since it returned cleanly.
-    # We will use OCR if the pyMuPDF fallback was triggered (less than 50 initially)
-    # The parser function logic dictates it but doesn't return the source flag.
-    # To match requirement: "If 'ocr' in result print -> source='ocr' else source='digital'"
-    # Our extract_text prints, so we'll determine here based on text length:
-    if len(raw_text.strip()) > 0:
-        source = "digital"
+    if filename_lower.endswith(('.jpg', '.jpeg', '.png')):
+        print("🖼️ Image OCR used")
+        image = Image.open(io.BytesIO(file_bytes))
+        raw_text = pytesseract.image_to_string(image, config='--psm 6')
+        source = "ocr"
     else:
-        source = "ocr" # This is a placeholder since extract_text doesn't return the method
+        # Extract text using parser service
+        raw_text = await extract_text(file_bytes)
         
-    # Since extract_text does not return the method used, we'll infer it by default digital 
-    # unless you want me to change extract_text to return a tuple.
-    # Wait, the instruction says: "Detect source: if "ocr" in result print → source="ocr" else source="digital""
-    # I will adapt the logic to match the spirit:
-    source = "ocr" if "ocr" in str(raw_text).lower() else "digital" # Temporary placeholder logic
+        # Detect the source from how much text was extracted
+        # The parser currently prints '📄 Digital PDF extracted' or '🔍 OCR fallback used', 
+        if len(raw_text.strip()) > 0:
+            source = "digital"
+        else:
+            source = "ocr" # This is a placeholder since extract_text doesn't return the method
+            
+        source = "ocr" if "ocr" in str(raw_text).lower() else "digital" # Temporary placeholder logic
 
     document_id = str(uuid.uuid4())
     doc = {
@@ -131,6 +132,7 @@ async def generate_fhir(request: FhirRequest):
     db = get_db()
     
     # Fetch extraction from db
+    print(f"Searching for extraction_id: {request.extraction_id}")
     extraction_record = await db.extractions.find_one({"extraction_id": request.extraction_id})
     if not extraction_record:
         raise HTTPException(status_code=404, detail="Extraction not found")
@@ -159,6 +161,7 @@ async def reconcile_data(request: ReconcileRequest):
     db = get_db()
     
     # Fetch fhir bundle from db
+    print(f"Searching for fhir_id: {request.fhir_id}")
     fhir_record = await db.fhir_bundles.find_one({"fhir_id": request.fhir_id})
     if not fhir_record:
         raise HTTPException(status_code=404, detail="FHIR bundle not found")
