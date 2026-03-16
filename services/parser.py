@@ -23,20 +23,21 @@ async def extract_text(file_bytes: bytes) -> str:
     # Clean up whitespace and check length
     text_content = extracted_text.strip()
     
-    if len(text_content) >= 50:
-        print("📄 Digital PDF")
+    if len(text_content) >= 100:
+        print("📄 Digital PDF extracted")
         return text_content
         
     # 2. Fallback to OCR if text is minimal (likely scanned)
     try:
-        print("🔍 OCR used")
         ocr_text = ""
-        # Convert PDF bytes to a list of PIL Images
-        images = convert_from_bytes(file_bytes)
+        # Convert PDF bytes to a list of PIL Images at 300 DPI
+        images = convert_from_bytes(file_bytes, dpi=300)
+        
+        print(f"🔍 OCR fallback used — {len(images)} pages")
         
         for image in images:
-            # Run pytesseract on each image
-            page_text = pytesseract.image_to_string(image)
+            # Run pytesseract on each image using PSM 6 for better accuracy
+            page_text = pytesseract.image_to_string(image, config="--psm 6")
             ocr_text += page_text + "\n"
             
         return ocr_text.strip()
