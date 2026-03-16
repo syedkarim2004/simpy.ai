@@ -9,12 +9,8 @@ json_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "ic
 try:
     with open(json_path, "r") as f:
         data = json.load(f)
-        # Store as {description: code} for fuzzy matching descriptions
-        for item in data:
-            description = item.get("description", "")
-            code = item.get("code", "")
-            if description and code:
-                CODE_MAP[description] = code
+        # The new format is immediately a dictionary of {description_lowercase: code}
+        CODE_MAP = data
 except Exception as e:
     print(f"Error loading ICD-10 codes: {e}")
 
@@ -31,7 +27,7 @@ async def map_icd10(diagnosis_text: str) -> dict:
     
     # rapidfuzz extractOne returns a tuple: (match_string, score, index)
     match = process.extractOne(
-        diagnosis_text, 
+        diagnosis_text.lower(), 
         descriptions, 
         scorer=fuzz.WRatio, 
         score_cutoff=60
