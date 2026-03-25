@@ -31,7 +31,7 @@ export default function Header() {
         </div>
         
         <div className="bg-teal/20 text-teal px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider border border-teal/30">
-          Bennett University
+          Abdul Karim
         </div>
         
         <div className="w-8 h-8 rounded-full bg-teal text-white flex items-center justify-center text-sm font-bold ml-2 shadow-sm border border-teal-600">

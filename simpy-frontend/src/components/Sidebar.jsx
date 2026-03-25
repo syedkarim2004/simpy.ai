@@ -32,10 +32,9 @@ export default function Sidebar() {
               to={link.path}
               end={link.path === '/app'}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-3 rounded-lg transition-all text-sm font-bold ${
-                  isActive
-                    ? 'bg-teal text-white shadow-[0_0_15px_rgba(13,148,136,0.2)]'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                `flex items-center gap-3 px-3 py-3 rounded-lg transition-all text-sm font-bold ${isActive
+                  ? 'bg-teal text-white shadow-[0_0_15px_rgba(13,148,136,0.2)]'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
                 }`
               }
             >

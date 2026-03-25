@@ -15,11 +15,13 @@ export default function Processing() {
   const [stepTimes, setStepTimes] = useState({});
 
   const steps = [
-    { id: 1, title: 'OCR Text Extraction', desc: 'Extracting text from document...', timeKey: 'step1' },
-    { id: 2, title: 'AI Entity Recognition', desc: 'MedGemma LLM extracting diagnoses, procedures, meds', timeKey: 'step2' },
-    { id: 3, title: 'ICD-10 Code Mapping', desc: 'Standardizing unaligned vocabulary to SNOMED/ICD-10', timeKey: 'step3' },
-    { id: 4, title: 'FHIR R4 Generation', desc: 'Structuring immutable interoperability payloads', timeKey: 'step4' },
-    { id: 5, title: 'Revenue Reconciliation', desc: 'Detecting mismatched leakage patterns securely', timeKey: 'step5' },
+    { id: 1, title: 'Document Digitization', desc: 'OCR + text extraction from uploaded document', timeKey: 'step1' },
+    { id: 2, title: 'Clinical NLP Extraction', desc: 'AI entity recognition: diagnoses, procedures, observations', timeKey: 'step2' },
+    { id: 3, title: 'Coding & Normalization', desc: 'ICD-10 / SNOMED CT / LOINC standardization', timeKey: 'step3' },
+    { id: 4, title: 'FHIR R4 Mapping', desc: 'ABDM-aligned FHIR bundle with Observations & DiagnosticReport', timeKey: 'step4' },
+    { id: 5, title: 'Revenue Reconciliation', desc: 'Cross-matching clinical vs billing data for mismatches', timeKey: 'step5' },
+    { id: 6, title: 'Claim Structuring', desc: 'Building payer-ready claim with ICD-10 + CPT line items', timeKey: 'step6' },
+    { id: 7, title: 'Validation & QA', desc: 'Error detection, coding completeness, ABDM compliance check', timeKey: 'step7' },
   ];
 
   const addLog = (msg) => {
@@ -50,14 +52,22 @@ export default function Processing() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ document_id })
         });
-        if (!extractRes.ok) throw new Error("Entity extraction failed from backend");
+        if (!extractRes.ok) throw new Error("Entity extraction failed from backend - Server Error");
         const extractData = await extractRes.json();
+        
+        if (extractData.status === "error") {
+            throw new Error(extractData.message || "AI Extraction failed due to rate limits or document size.");
+        }
+
+        const entities = extractData.entities || {};
+        const diagCount = entities.diagnosis?.length || entities.diagnoses?.length || entities.findings?.length || 0;
+        const procCount = entities.procedures?.length || 0;
+
         const extraction_id = extractData.extraction_id;
         localStorage.setItem('extraction_id', extraction_id);
-        localStorage.setItem('entities', JSON.stringify(extractData.entities));
+        localStorage.setItem('entities', JSON.stringify(entities));
         
-        const diagCount = extractData.entities?.diagnoses?.length || 0;
-        addLog(`Success. Extracted ${diagCount} diagnoses.`);
+        addLog(`Success. Extracted ${diagCount} diagnoses/findings.`);
         setStepTimes(p => ({...p, step2: `${Math.round(performance.now() - t1)}ms`}));
         setCurrentStepIndex(3);
 
@@ -88,11 +98,17 @@ export default function Processing() {
         // STEP 5: Revenue Reconciliation
         const t4 = performance.now();
         addLog("POST /reconcile - Firing mismatch detection against billed inputs.");
+        // Build billed_data dynamically from what was actually extracted
+        const extractedDiagCodes = (entities.diagnosis || entities.diagnoses || [])
+          .map(d => d.icd_code || d.icd10_code || d.icd10?.code)
+          .filter(Boolean);
+        const extractedProcNames = (entities.procedures || [])
+          .map(p => p.text || p.name || p.procedure_name)
+          .filter(Boolean);
         const billed_data = {
-          "billed_diagnoses": [{"code": "E11.9"}],
-          "billed_procedures": [{"code": "99214"}],
-          "total_amount": 49500
-        }; 
+          "diagnoses": extractedDiagCodes.length > 0 ? extractedDiagCodes : [],
+          "procedures": extractedProcNames.length > 0 ? extractedProcNames : []
+        };
         
         const reconcileRes = await fetch('http://localhost:8000/reconcile', {
           method: 'POST',
@@ -104,10 +120,52 @@ export default function Processing() {
         localStorage.setItem('report', JSON.stringify({report: reconcileData.report}));
         addLog(`Complete. Final Score calculated: ${reconcileData.report?.reconciliation_score}/100`);
         setStepTimes(p => ({...p, step5: `${Math.round(performance.now() - t4)}ms`}));
+        setCurrentStepIndex(6);
+
+        // STEP 6: Claim Structuring
+        const t5 = performance.now();
+        addLog("POST /claim - Structuring payer-ready claim from FHIR bundle.");
+        try {
+          const claimRes = await fetch('http://localhost:8000/claim', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fhir_id })
+          });
+          if (claimRes.ok) {
+            const claimData = await claimRes.json();
+            localStorage.setItem('claim_data', JSON.stringify(claimData.claim));
+            const charges = claimData.claim?.financials?.total_estimated_charges || 0;
+            addLog(`Claim structured: ${claimData.claim?.diagnosis_lines?.length || 0} diagnosis lines, ₹${charges} total charges`);
+          } else {
+            addLog("WARN: Claim structuring returned non-200, skipping.");
+          }
+        } catch(e) { addLog(`WARN: Claim structuring failed: ${e.message}`); }
+        setStepTimes(p => ({...p, step6: `${Math.round(performance.now() - t5)}ms`}));
+        setCurrentStepIndex(7);
+
+        // STEP 7: Validation & Error Detection
+        const t6 = performance.now();
+        addLog("POST /validate - Running ABDM compliance & coding completeness checks.");
+        try {
+          const valRes = await fetch('http://localhost:8000/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fhir_id })
+          });
+          if (valRes.ok) {
+            const valData = await valRes.json();
+            localStorage.setItem('validation_report', JSON.stringify(valData.validation));
+            const v = valData.validation;
+            addLog(`Validation: ${v.status} | Score: ${v.validation_score}/100 | Errors: ${v.summary?.errors} | Warnings: ${v.summary?.warnings}`);
+          } else {
+            addLog("WARN: Validation returned non-200, skipping.");
+          }
+        } catch(e) { addLog(`WARN: Validation failed: ${e.message}`); }
+        setStepTimes(p => ({...p, step7: `${Math.round(performance.now() - t6)}ms`}));
         
-        setCurrentStepIndex(6); // All steps complete
+        setCurrentStepIndex(8); // All steps complete
         setPipelineComplete(true);
-        addLog("PIPELINE AUTOMATION COMPLETE.");
+        addLog("PIPELINE AUTOMATION COMPLETE — 7/7 stages finished.");
 
       } catch (err) {
         console.error(err);

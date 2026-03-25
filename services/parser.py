@@ -1,6 +1,7 @@
 import fitz  # PyMuPDF
 from pdf2image import convert_from_bytes
 import pytesseract
+pytesseract.pytesseract.tesseract_cmd = "/opt/homebrew/bin/tesseract"
 import io
 
 async def extract_text(file_bytes: bytes) -> str:
@@ -23,7 +24,7 @@ async def extract_text(file_bytes: bytes) -> str:
     # Clean up whitespace and check length
     text_content = extracted_text.strip()
     
-    if len(text_content) >= 100:
+    if len(text_content) >= 50:
         print("📄 Digital PDF extracted")
         return text_content
         
@@ -40,6 +41,7 @@ async def extract_text(file_bytes: bytes) -> str:
             page_text = pytesseract.image_to_string(image, config="--psm 6")
             ocr_text += page_text + "\n"
             
+        print("OCR TEXT:", ocr_text[:1000])
         return ocr_text.strip()
     except Exception as e:
         print(f"Error performing OCR: {e}")

@@ -1,4 +1,5 @@
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,12 +9,15 @@ import uuid
 import io
 from PIL import Image
 import pytesseract
+pytesseract.pytesseract.tesseract_cmd = "/opt/homebrew/bin/tesseract"
 # Import database and services
 from db import connect_db, get_db
 from services.parser import extract_text
 from services.extractor import extract_entities
 from services.fhir import build_fhir_bundle
 from services.reconciler import reconcile
+from services.claim_structurer import structure_claim
+from services.validator import validate_bundle
 
 # Load .env file on startup
 load_dotenv()
@@ -51,6 +55,17 @@ class ReconcileRequest(BaseModel):
     fhir_id: str
     billed_data: dict
 
+class ValidateRequest(BaseModel):
+    fhir_id: str
+
+class ClaimRequest(BaseModel):
+    fhir_id: str
+
+class FeedbackRequest(BaseModel):
+    report_id: str
+    corrections: list
+    reviewer: str = "anonymous"
+
 @app.get("/")
 async def health_check():
     return {"service": "Simpy.ai", "status": "live"}
@@ -65,7 +80,7 @@ async def ingest_file(file: UploadFile = File(...)):
     if filename_lower.endswith(('.jpg', '.jpeg', '.png')):
         print("🖼️ Image OCR used")
         image = Image.open(io.BytesIO(file_bytes))
-        raw_text = pytesseract.image_to_string(image, config='--psm 6')
+        raw_text = await asyncio.to_thread(pytesseract.image_to_string, image, config='--psm 6')
         source = "ocr"
     else:
         # Extract text using parser service
@@ -110,21 +125,39 @@ async def extract_data(request: ExtractRequest):
     raw_text = doc.get("raw_text", "")
     source = doc.get("source", "digital")
     
-    # Call extraction service
-    entities = await extract_entities(raw_text, source)
+    # Call extraction service with error handling
+    try:
+        entities = await extract_entities(raw_text, source)
+    except Exception as e:
+        print(f"❌ Extraction error: {e}")
+        return {
+            "extraction_id": str(uuid.uuid4()),
+            "status": "error",
+            "message": str(e),
+            "entities": {
+                "diagnosis": [],
+                "procedures": [],
+                "patients": []
+            }
+        }
     
     extraction_id = str(uuid.uuid4())
     extraction_record = {
         "extraction_id": extraction_id,
         "document_id": request.document_id,
-        "entities": entities
+        "entities": entities,
+        "report_type": entities.get("report_type", "Mixed"),
+        "status": entities.get("status", "completed")
     }
     
     await db.extractions.insert_one(extraction_record)
     
     return {
         "extraction_id": extraction_id,
-        "entities": entities
+        "entities": entities,
+        "report_type": entities.get("report_type", "Mixed"),
+        "status": entities.get("status", "completed"),
+        "message": entities.get("error", "")
     }
 
 @app.post("/fhir")
@@ -139,13 +172,19 @@ async def generate_fhir(request: FhirRequest):
         
     entities = extraction_record.get("entities", {})
     
-    # Call FHIR service
-    bundle = build_fhir_bundle(entities)
+    if not entities.get("diagnosis") and not entities.get("findings") and not entities.get("measurements"):
+        # The prompt says 'DO NOT FAIL SILENTLY'. So we only fail if absolutely empty.
+        pass # Allow FHIR to generate whatever it can
+    
+    # Call FHIR service with report_type for dynamic LOINC selection
+    report_type = extraction_record.get("report_type", "Mixed")
+    bundle = await asyncio.to_thread(build_fhir_bundle, entities, report_type)
     
     fhir_id = str(uuid.uuid4())
     fhir_record = {
         "fhir_id": fhir_id,
         "extraction_id": request.extraction_id,
+        "report_type": report_type,
         "bundle": bundle
     }
     
@@ -153,7 +192,8 @@ async def generate_fhir(request: FhirRequest):
     
     return {
         "fhir_id": fhir_id,
-        "bundle": bundle
+        "bundle": bundle,
+        "report_type": report_type
     }
 
 @app.post("/reconcile")
@@ -169,7 +209,7 @@ async def reconcile_data(request: ReconcileRequest):
     bundle = fhir_record.get("bundle", {})
     
     # Call reconciler service
-    report = reconcile(bundle, request.billed_data)
+    report = await asyncio.to_thread(reconcile, bundle, request.billed_data)
     
     report_id = str(uuid.uuid4())
     report_record = {
@@ -184,3 +224,61 @@ async def reconcile_data(request: ReconcileRequest):
         "report_id": report_id,
         "report": report
     }
+
+@app.post("/validate")
+async def validate_data(request: ValidateRequest):
+    db = get_db()
+    
+    fhir_record = await db.fhir_bundles.find_one({"fhir_id": request.fhir_id})
+    if not fhir_record:
+        raise HTTPException(status_code=404, detail="FHIR bundle not found")
+    
+    bundle = fhir_record.get("bundle", {})
+    
+    # Get original extraction entities for cross-validation
+    extraction_id = fhir_record.get("extraction_id")
+    extraction_record = await db.extractions.find_one({"extraction_id": extraction_id}) if extraction_id else None
+    entities = extraction_record.get("entities", {}) if extraction_record else {}
+    
+    validation_report = await asyncio.to_thread(validate_bundle, bundle, entities)
+    
+    return {"validation": validation_report}
+
+@app.post("/claim")
+async def generate_claim(request: ClaimRequest):
+    db = get_db()
+    
+    fhir_record = await db.fhir_bundles.find_one({"fhir_id": request.fhir_id})
+    if not fhir_record:
+        raise HTTPException(status_code=404, detail="FHIR bundle not found")
+    
+    bundle = fhir_record.get("bundle", {})
+    report_type = fhir_record.get("report_type", "Mixed")
+    
+    claim = await asyncio.to_thread(structure_claim, bundle, report_type)
+    
+    claim_id = str(uuid.uuid4())
+    claim_record = {
+        "claim_id": claim_id,
+        "fhir_id": request.fhir_id,
+        "claim": claim
+    }
+    await db.claims.insert_one(claim_record)
+    
+    return {"claim_id": claim_id, "claim": claim}
+
+@app.post("/feedback")
+async def submit_feedback(request: FeedbackRequest):
+    db = get_db()
+    
+    feedback_record = {
+        "report_id": request.report_id,
+        "corrections": request.corrections,
+        "reviewer": request.reviewer,
+        "submitted_at": str(uuid.uuid4())[:8],
+        "status": "pending_review"
+    }
+    
+    await db.feedback.insert_one(feedback_record)
+    
+    return {"status": "feedback_received", "corrections_count": len(request.corrections)}

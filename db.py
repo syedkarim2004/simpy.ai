@@ -8,8 +8,8 @@ db = None
 async def connect_db():
     global client, db
     try:
-        mongo_uri = os.getenv("MONGO_URI")
-        client = AsyncIOMotorClient(mongo_uri)
+        mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+        client = AsyncIOMotorClient(mongo_uri, serverSelectionTimeoutMS=3000)
         db = client.simpy_ai
         
         # Collections mapping based on requirements

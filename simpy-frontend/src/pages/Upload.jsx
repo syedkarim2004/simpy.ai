@@ -78,6 +78,14 @@ export default function Upload() {
 
     const formData = new FormData();
     formData.append('file', file);
+    
+    // Clear stale session data to prevent UI ghosts
+    localStorage.removeItem('report');
+    localStorage.removeItem('entities');
+    localStorage.removeItem('fhir_bundle');
+    localStorage.removeItem('document_id');
+    localStorage.removeItem('extraction_id');
+    localStorage.removeItem('fhir_id');
 
     try {
       const response = await fetch('http://localhost:8000/ingest', {

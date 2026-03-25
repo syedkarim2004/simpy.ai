@@ -11,3 +11,4 @@ groq
 mlx-lm
 fhir.resources
 rapidfuzz
+requests
