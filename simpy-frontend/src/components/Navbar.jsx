@@ -63,6 +63,7 @@ export default function Navbar() {
       case '/app/processing': return 'Dashboard › Processing Pipeline';
       case '/app/report': return 'Dashboard › Reconciliation Report';
       case '/app/history': return 'Dashboard › Document History';
+      case '/app/multi-patient': return 'Dashboard › Multi-Patient Pipeline';
       default: return 'Dashboard Overview';
     }
   };

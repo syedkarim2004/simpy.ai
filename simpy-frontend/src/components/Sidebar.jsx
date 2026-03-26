@@ -7,6 +7,7 @@ export default function Sidebar() {
     { name: 'Processing', path: '/app/processing', icon: Activity },
     { name: 'Report', path: '/app/report', icon: FileText },
     { name: 'History', path: '/app/history', icon: Clock },
+    { name: 'Multi-Patient', path: '/app/multi-patient', icon: HeartPulse },
   ];
 
   return (
@@ -49,7 +50,7 @@ export default function Sidebar() {
         <div className="w-full h-px bg-slate-800 mb-6"></div>
         {/* 4. Bottom section */}
         <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Powered By</p>
-        <p className="text-white font-medium text-sm mt-1.5 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div> MedGemma AI</p>
+        <div className="text-white font-medium text-sm mt-1.5 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div> MedGemma AI</div>
         <p className="text-slate-600 text-[10px] mt-2 font-mono">v2.0.0-beta</p>
       </div>
     </div>

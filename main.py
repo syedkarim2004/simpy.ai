@@ -18,6 +18,9 @@ from services.fhir import build_fhir_bundle
 from services.reconciler import reconcile
 from services.claim_structurer import structure_claim
 from services.validator import validate_bundle
+from services.pdf_parser import extract_text_from_pdf, extract_pages_from_pdf
+from services.patient_splitter import split_patients_via_groq, extract_patient_from_page
+import time
 
 # Load .env file on startup
 load_dotenv()
@@ -277,8 +280,47 @@ async def submit_feedback(request: FeedbackRequest):
         "reviewer": request.reviewer,
         "submitted_at": str(uuid.uuid4())[:8],
         "status": "pending_review"
-    }
+      }
     
     await db.feedback.insert_one(feedback_record)
     
     return {"status": "feedback_received", "corrections_count": len(request.corrections)}
+
+@app.post("/api/upload-pdf")
+async def upload_multi_patient_pdf(file: UploadFile = File(...)):
+    """
+    Accepts a multi-patient PDF, extracts pages, and uses Groq AI to extract patient data in parallel.
+    """
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+    
+    file_bytes = await file.read()
+    
+    # Extract list of pages using the new pdf_parser service
+    pages = extract_pages_from_pdf(file_bytes)
+    
+    if not pages:
+        raise HTTPException(status_code=400, detail="Failed to extract text from PDF or PDF is empty/too small.")
+    
+    # Use a Semaphore to limit concurrency and avoid rate limits
+    MAX_CONCURRENCY = 5
+    semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
+    
+    async def process_with_semaphore(page_text, page_num):
+        async with semaphore:
+            return await extract_patient_from_page(page_text, page_num)
+
+    try:
+        # Create tasks for all pages
+        tasks = [process_with_semaphore(page_text, i + 1) for i, page_text in enumerate(pages)]
+        
+        print(f"🚀 Starting concurrent processing of {len(pages)} pages...")
+        patients = await asyncio.gather(*tasks)
+        
+        return {
+            "total_patients": len(patients),
+            "patients": patients
+        }
+    except Exception as e:
+        print(f"❌ Error in multi-patient processing: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -5,6 +5,7 @@ import Upload from './pages/Upload';
 import Processing from './pages/Processing';
 import Report from './pages/Report';
 import History from './pages/History';
+import MultiPatientUpload from './pages/MultiPatientUpload';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 
@@ -52,6 +53,7 @@ function App() {
           <Route path="processing" element={<Processing />} />
           <Route path="report" element={<Report />} />
           <Route path="history" element={<History />} />
+          <Route path="multi-patient" element={<MultiPatientUpload />} />
         </Route>
 
         {/* Catch-all → back to landing */}
