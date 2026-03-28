@@ -87,6 +87,25 @@ export default function AdminLogin() {
               Sign In <Lock className="w-4 h-4 group-hover:scale-110 transition-transform" />
             </button>
           </form>
+
+          <div className="relative flex items-center py-6 px-2">
+            <div className="flex-grow border-t border-slate-800"></div>
+            <span className="flex-shrink mx-4 text-[10px] font-bold text-slate-600 uppercase tracking-widest">or</span>
+            <div className="flex-grow border-t border-slate-800"></div>
+          </div>
+
+          <button 
+            onClick={() => {
+              localStorage.setItem('simpy_authed', 'true');
+              localStorage.setItem('simpy_token', 'mock_admin_token');
+              localStorage.setItem('simpy_user', JSON.stringify({ email: 'admin@simpy.ai', role: 'admin' }));
+              localStorage.setItem('simpy_portal', 'admin');
+              navigate('/admin/dashboard');
+            }}
+            className="w-full py-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-violet-500/50 rounded-xl text-slate-300 hover:text-white font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 group"
+          >
+            Developer: Use Demo Account <ArrowLeft className="w-3 h-3 rotate-180 group-hover:translate-x-1 transition-transform" />
+          </button>
           
           <button 
             onClick={() => navigate('/')}
