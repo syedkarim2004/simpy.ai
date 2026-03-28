@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import FHIRScrollytelling from '../components/FHIRScrollytelling';
 
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
@@ -471,6 +472,8 @@ export default function Landing() {
             ))}
           </div>
         </section>
+
+        <FHIRScrollytelling />
 
         {/* ── THREE STEPS ─────────────────────────────────────── */}
         <section id="how-it-works" style={{ maxWidth: 1200, margin: '0 auto', padding: '80px 48px' }}>

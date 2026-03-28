@@ -1,3 +1,22 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+.fhir-grid-bg {
+  background-image:
+    linear-gradient(rgba(29,184,153,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(29,184,153,0.06) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+@keyframes fhirPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(29,184,153,0.4); }
+  50%       { box-shadow: 0 0 0 5px rgba(29,184,153,0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fhir-badge { animation: none; }
+  * { transition-duration: 0.01ms !important; }
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
