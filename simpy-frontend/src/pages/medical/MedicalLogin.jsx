@@ -27,6 +27,7 @@ export default function MedicalLogin() {
         localStorage.setItem("simpy_user", JSON.stringify(data.user));
         localStorage.setItem("simpy_portal", "medical");
         localStorage.setItem("simpy_authed", "true");
+        localStorage.setItem("simpy_token", credentialResponse.credential);
         // Redirect to medical dashboard as requested
         window.location.href = "http://localhost:5173/app";
       } else {
@@ -111,6 +112,7 @@ export default function MedicalLogin() {
                       }));
                       localStorage.setItem("simpy_portal", "medical");
                       localStorage.setItem("simpy_authed", "true");
+                      localStorage.setItem("simpy_token", "mock_demo_token_123");
                       window.location.href = "http://localhost:5173/app";
                     }, 800);
                   }}
