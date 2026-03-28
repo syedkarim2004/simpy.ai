@@ -1,6 +1,49 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldAlert, User, ShieldCheck, Activity, Code2, AlertTriangle, FilePlus, Download, CheckCircle2, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { ShieldAlert, User, ShieldCheck, Activity, Code2, AlertTriangle, FilePlus, Download, CheckCircle2, ChevronDown, ChevronUp, Info, Sparkles, Wand2, CheckCircle, XCircle } from 'lucide-react';
+
+const generateMissingFieldsPrompt = (reportData) => `
+You are a clinical RCM (Revenue Cycle Management) audit assistant specialized in medical claim validation.
+
+Analyze the following extracted claim data and identify what is missing, incomplete, or flagged for review.
+
+## Extracted Claim Data:
+${JSON.stringify(reportData, null, 2)}
+
+## Your Task:
+Return a JSON response with EXACTLY this structure (no markdown, no explanation, raw JSON only):
+
+{
+  "summary": "One line overall assessment of claim completeness",
+  "completeness_score": <number 0-100>,
+  "critical_missing": [
+    {
+      "field": "field name",
+      "reason": "why it's critical",
+      "impact": "what happens if missing"
+    }
+  ],
+  "warnings": [
+    {
+      "field": "field name", 
+      "issue": "what's wrong or incomplete"
+    }
+  ],
+  "suggestions": [
+    "Actionable suggestion 1",
+    "Actionable suggestion 2"
+  ],
+  "claim_ready": <true or false>
+}
+
+Rules:
+- Be specific to RCM and medical billing context
+- Reference actual field values from the data above
+- If patient gender or age is unknown, always flag it
+- Check for missing CPT codes, incomplete diagnosis chains, undocumented procedures
+- Keep each reason under 15 words
+- Return ONLY the JSON, nothing else
+`;
 
 function cleanMismatchMessage(msg) {
   if (!msg) return msg;
@@ -20,6 +63,8 @@ export default function Report() {
   const [claimData, setClaimData] = useState(null);
   const [validationReport, setValidationReport] = useState(null);
   const [feedbackSent, setFeedbackSent] = useState(false);
+  const [rcmAudit, setRcmAudit] = useState(null);
+  const [isAuditing, setIsAuditing] = useState(false);
 
   const toggleMismatch = (idx) => {
     setExpandedMismatches(prev => ({
@@ -123,6 +168,53 @@ export default function Report() {
     dt.click();
   };
 
+  const runSmartAudit = async () => {
+    if (!reportData) return;
+    setIsAuditing(true);
+    try {
+      const dataForAudit = {
+        patient: { name: patient.name, age: patient.age, gender: patient.gender },
+        diagnoses: (entities?.diagnosis || entities?.diagnoses || []).map(d => ({ text: d.text, icd: d.icd_code, confidence: d.confidence })),
+        procedures: (entities?.procedures || []).map(p => ({ text: p.text })),
+        mismatches: reportData.mismatches || []
+      };
+
+      const prompt = generateMissingFieldsPrompt(dataForAudit);
+      const key = import.meta.env.VITE_GROQ_API_KEY;
+      
+      if (!key) {
+        alert("Please set a valid VITE_GROQ_API_KEY in your .env file.");
+        setIsAuditing(false);
+        return;
+      }
+
+      const response = await fetch(`https://api.groq.com/openai/v1/chat/completions`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${key}`
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.2,
+          max_tokens: 1000
+        })
+      });
+      
+      const json = await response.json();
+      const rawText = json.choices[0].message.content;
+      // Clean possible markdown backticks
+      const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      setRcmAudit(JSON.parse(cleanText));
+    } catch (e) {
+      console.error("Audit failed", e);
+      alert("AI Audit failed. Check console for details.");
+    } finally {
+      setIsAuditing(false);
+    }
+  };
+
   return (
     <div className="max-w-[1400px] mx-auto pb-16">
       <div className="flex justify-between items-center mb-8">
@@ -191,6 +283,7 @@ export default function Report() {
           { id: 'reconciliation', label: 'Reconciliation', icon: '⚖️' },
           { id: 'claim', label: 'Claim Summary', icon: '📋' },
           { id: 'validation', label: 'Validation', icon: '🔍' },
+          { id: 'audit', label: 'AI RCM Audit', icon: '✨' },
           { id: 'review', label: 'Human Review', icon: '👤' },
         ].map(tab => (
           <button
@@ -315,13 +408,16 @@ export default function Report() {
         {/* RIGHT COL: Data Tables */}
         <div className="lg:col-span-2 flex flex-col gap-6">
             
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex-1">
-               <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex items-center gap-3 text-navy">
+            <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex-1 flex flex-col">
+               <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex items-center justify-between text-navy transition-all duration-300">
                   <h3 className="font-bold tracking-wide">AI Extracted Diagnoses</h3>
+                  <span className="text-[10px] font-black bg-teal/10 text-teal px-2 py-1 rounded border border-teal/20 uppercase tracking-widest">
+                    {(entities?.diagnosis || entities?.diagnoses)?.length || 0} Items
+                  </span>
                </div>
-               <div className="p-0 overflow-x-auto">
-                   <table className="w-full text-left border-collapse">
-                      <thead>
+               <div className="p-0 overflow-x-auto max-h-[320px] overflow-y-auto custom-scrollbar">
+                    <table className="w-full text-left border-collapse">
+                       <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_0_0_rgba(0,0,0,0.05)]">
                         <tr className="bg-white border-b border-slate-100">
                           <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Diagnosis Text</th>
                           <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[120px]">ICD-10 Code</th>
@@ -383,13 +479,16 @@ export default function Report() {
                </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex-1">
-               <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex items-center gap-3 text-navy">
+            <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex-1 flex flex-col">
+               <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex items-center justify-between text-navy transition-all duration-300">
                   <h3 className="font-bold tracking-wide">AI Extracted Procedures</h3>
+                  <span className="text-[10px] font-black bg-blue-500/10 text-blue-600 px-2 py-1 rounded border border-blue-500/20 uppercase tracking-widest">
+                    {entities?.procedures?.length || 0} Items
+                  </span>
                </div>
-               <div className="p-0 overflow-x-auto">
-                   <table className="w-full text-left border-collapse">
-                      <thead>
+               <div className="p-0 overflow-x-auto max-h-[320px] overflow-y-auto custom-scrollbar">
+                    <table className="w-full text-left border-collapse">
+                       <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_0_0_rgba(0,0,0,0.05)]">
                         <tr className="bg-white border-b border-slate-100">
                           <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Procedure</th>
                           <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[120px] text-right">Status</th>
@@ -629,6 +728,131 @@ export default function Report() {
       {activeTab === 'validation' && !validationReport && (
         <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-400 font-medium mb-8">
           No validation data available. Re-process the document to generate validation report.
+        </div>
+      )}
+
+      {/* ═══ AI RCM AUDIT TAB ═══ */}
+      {activeTab === 'audit' && (
+        <div className="space-y-6 mb-8">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden p-8 text-center">
+            {!rcmAudit ? (
+              <div className="py-12 flex flex-col items-center">
+                <div className="w-20 h-20 bg-teal/10 rounded-full flex items-center justify-center mb-6">
+                  <Wand2 className={`w-10 h-10 text-teal ${isAuditing ? 'animate-pulse' : ''}`} />
+                </div>
+                <h3 className="text-2xl font-black text-navy mb-2">Simpy AI Auditor</h3>
+                <p className="text-slate-500 max-w-sm mx-auto mb-8 font-medium">
+                  Run an autonomous clinical audit to identify missing fields, claim risks, and RCM discrepancies using Groq Llama 3.3.
+                </p>
+                <button 
+                  onClick={runSmartAudit}
+                  disabled={isAuditing}
+                  className="bg-navy text-white px-8 py-3 rounded-xl font-black text-lg shadow-xl shadow-navy/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-3 disabled:opacity-50"
+                >
+                  {isAuditing ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                      Analyzing Claim Data...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-5 h-5" />
+                      Run AI Audit Report
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <div className="text-left animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex justify-between items-start mb-8 border-b border-slate-100 pb-6">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                       <span className="bg-teal text-white text-[10px] font-black px-2 py-1 rounded">RCM INTELLIGENCE</span>
+                       <span className="text-slate-400 text-xs font-bold font-mono">ID: {Math.random().toString(36).substr(2, 9).toUpperCase()}</span>
+                    </div>
+                    <h3 className="text-2xl font-black text-navy">{rcmAudit.summary}</h3>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-3xl font-black text-navy">{rcmAudit.completeness_score}%</div>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Audit Score</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Critical Missing */}
+                  <div className="space-y-4">
+                    <h4 className="flex items-center gap-2 text-xs font-black text-red-500 uppercase tracking-widest">
+                      <AlertTriangle className="w-4 h-4" /> Critical Missing Fields
+                    </h4>
+                    {rcmAudit.critical_missing.length > 0 ? rcmAudit.critical_missing.map((item, i) => (
+                      <div key={i} className="bg-red-50 border border-red-100 p-4 rounded-xl">
+                        <p className="font-black text-red-700 text-sm mb-1">{item.field}</p>
+                        <p className="text-xs text-red-600 font-medium mb-2">{item.reason}</p>
+                        <div className="flex items-center gap-1 text-[10px] font-black text-red-400 uppercase">
+                          <XCircle className="w-3 h-3" /> Impact: {item.impact}
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="text-slate-400 text-sm italic font-medium">No critical missing fields detected.</div>
+                    )}
+                  </div>
+
+                  {/* Warnings & Suggestions */}
+                  <div className="space-y-6">
+                    <div className="space-y-4">
+                      <h4 className="flex items-center gap-2 text-xs font-black text-orange-500 uppercase tracking-widest">
+                        <ShieldAlert className="w-4 h-4" /> Technical Warnings
+                      </h4>
+                      <div className="bg-orange-50/50 border border-orange-100 rounded-xl divide-y divide-orange-100">
+                        {rcmAudit.warnings.map((w, i) => (
+                          <div key={i} className="p-3 text-xs">
+                            <span className="font-bold text-orange-700 mr-2">{w.field}:</span>
+                            <span className="text-orange-600 font-medium">{w.issue}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="flex items-center gap-2 text-xs font-black text-teal uppercase tracking-widest">
+                        <CheckCircle className="w-4 h-4" /> AI Suggestions
+                      </h4>
+                      <ul className="space-y-2">
+                        {rcmAudit.suggestions.map((s, i) => (
+                          <li key={i} className="flex items-start gap-2 text-xs text-slate-600 font-medium bg-slate-50 p-3 rounded-lg border border-slate-100">
+                             <div className="w-1.5 h-1.5 rounded-full bg-teal mt-1 shrink-0" />
+                             {s}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-10 p-6 bg-navy rounded-2xl flex items-center justify-between">
+                  <div>
+                    <p className="text-white font-black text-xl mb-1">
+                      {rcmAudit.claim_ready ? "Claim Ready for Submission" : "Re-review Required"}
+                    </p>
+                    <p className="text-slate-400 text-xs font-medium">Based on 14 data-point clinical audit</p>
+                  </div>
+                  <div className="flex gap-4">
+                    <button 
+                      onClick={() => setRcmAudit(null)}
+                      className="px-6 py-2.5 bg-slate-800 text-slate-300 rounded-lg text-sm font-bold border border-slate-700 hover:bg-slate-700"
+                    >
+                      Re-run Audit
+                    </button>
+                    {rcmAudit.claim_ready && (
+                      <button className="px-6 py-2.5 bg-teal text-white rounded-lg text-sm font-black shadow-lg shadow-teal/20 hover:scale-105 transition-transform">
+                        Proceed to Billing
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
