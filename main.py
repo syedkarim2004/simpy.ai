@@ -20,6 +20,7 @@ from services.claim_structurer import structure_claim
 from services.validator import validate_bundle
 from services.pdf_parser import extract_text_from_pdf, extract_pages_from_pdf
 from services.patient_splitter import split_patients_via_groq, extract_patient_from_page
+from services.auth import router as auth_router
 import time
 
 # Load .env file on startup
@@ -46,6 +47,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_router, prefix="/api/auth")
 
 # Pydantic models for request bodies
 class ExtractRequest(BaseModel):

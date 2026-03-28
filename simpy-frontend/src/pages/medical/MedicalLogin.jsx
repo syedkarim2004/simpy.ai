@@ -1,25 +1,46 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Stethoscope, Lock, ArrowLeft, AlertCircle } from 'lucide-react';
+import { Stethoscope, Lock, ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function MedicalLogin() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e) => {
-    e.preventDefault();
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setLoading(true);
     setError('');
+    
+    try {
+      const response = await fetch('http://localhost:8000/api/auth/google', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token: credentialResponse.credential }),
+      });
 
-    if (password === 'simpy123') {
-      localStorage.setItem('simpy_authed', 'true');
-      localStorage.setItem('simpy_token', 'mock_medical_token');
-      localStorage.setItem('simpy_user', JSON.stringify({ email, role: 'medical' }));
-      navigate('/medical/dashboard');
-    } else {
-      setError('Invalid credentials. Please use the authorized medical team password.');
+      const data = await response.json();
+
+      if (data.success) {
+        localStorage.setItem("simpy_user", JSON.stringify(data.user));
+        localStorage.setItem("simpy_portal", "medical");
+        localStorage.setItem("simpy_authed", "true");
+        // Redirect to medical dashboard as requested
+        window.location.href = "http://localhost:5173/app";
+      } else {
+        setError(data.error || 'Authentication failed. Please try again.');
+      }
+    } catch (err) {
+      setError('Connection to security server failed. Please try again later.');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleGoogleError = () => {
+    setError('Google Sign-In failed. Please try again.');
   };
 
   return (
@@ -48,49 +69,39 @@ export default function MedicalLogin() {
             <p className="text-slate-400 font-medium">Standardized Clinical Access</p>
           </div>
 
-          <form className="space-y-6" onSubmit={handleLogin}>
+          <div className="flex flex-col items-center justify-center space-y-6">
             {error && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+              <div className="w-full bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
                 <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                 <p className="text-sm font-medium leading-relaxed">{error}</p>
               </div>
             )}
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Medical Email</label>
-              <input 
-                type="email" 
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="dr.smith@simpy.ai"
-                className="w-full px-5 py-4 bg-[#020617] border border-slate-800 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-medium text-white placeholder-slate-600"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Access Password</label>
-              <input 
-                type="password" 
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-5 py-4 bg-[#020617] border border-slate-800 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-medium text-white placeholder-slate-600"
-              />
-            </div>
+            {loading ? (
+              <div className="flex flex-col items-center gap-4 py-8">
+                <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
+                <p className="text-emerald-500 font-black uppercase tracking-widest text-xs">Authenticating...</p>
+              </div>
+            ) : (
+              <div className="w-full flex justify-center py-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  theme="filled_blue"
+                  shape="pill"
+                  width="100%"
+                />
+              </div>
+            )}
 
-            <button 
-              type="submit"
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 mt-4 group"
-            >
-              Sign In <Lock className="w-4 h-4 group-hover:scale-110 transition-transform" />
-            </button>
-          </form>
+            <p className="text-slate-500 text-xs font-medium text-center px-4 leading-relaxed">
+              Use your authorized institution Google account to access clinical records.
+            </p>
+          </div>
           
           <button 
             onClick={() => navigate('/')}
-            className="w-full mt-8 text-slate-500 font-bold text-xs uppercase tracking-widest hover:text-white transition-colors flex items-center justify-center gap-2"
+            className="w-full mt-10 text-slate-500 font-bold text-xs uppercase tracking-widest hover:text-white transition-colors flex items-center justify-center gap-2"
           >
             <ArrowLeft className="w-3 h-3" /> Back to Portal Select
           </button>
