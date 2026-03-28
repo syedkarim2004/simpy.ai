@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom
 import PortalSelect from './pages/PortalSelect';
 import PreauthLogin from './pages/PreauthLogin';
 import PreauthDashboard from './pages/PreauthDashboard';
-import MedicalLogin from './pages/MedicalLogin';
+import MedicalLogin from './pages/medical/MedicalLogin';
 import MedicalDashboard from './pages/MedicalDashboard';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
