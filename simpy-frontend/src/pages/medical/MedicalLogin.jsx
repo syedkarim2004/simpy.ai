@@ -83,19 +83,46 @@ export default function MedicalLogin() {
                 <p className="text-emerald-500 font-black uppercase tracking-widest text-xs">Authenticating...</p>
               </div>
             ) : (
-              <div className="w-full flex justify-center py-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors">
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={handleGoogleError}
-                  theme="filled_blue"
-                  shape="pill"
-                  width="100%"
-                />
+              <div className="w-full space-y-4">
+                <div className="w-full flex justify-center py-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    theme="filled_blue"
+                    shape="pill"
+                    width="100%"
+                  />
+                </div>
+                
+                <div className="relative flex items-center py-2 px-2">
+                  <div className="flex-grow border-t border-slate-800"></div>
+                  <span className="flex-shrink mx-4 text-[10px] font-bold text-slate-600 uppercase tracking-widest">or</span>
+                  <div className="flex-grow border-t border-slate-800"></div>
+                </div>
+
+                <button 
+                  onClick={() => {
+                    setLoading(true);
+                    setTimeout(() => {
+                      localStorage.setItem("simpy_user", JSON.stringify({
+                        name: "Demo Physician",
+                        email: "demo@simpy.ai",
+                        picture: "https://api.dicebear.com/7.x/avataaars/svg?seed=physician"
+                      }));
+                      localStorage.setItem("simpy_portal", "medical");
+                      localStorage.setItem("simpy_authed", "true");
+                      window.location.href = "http://localhost:5173/app";
+                    }, 800);
+                  }}
+                  className="w-full py-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-emerald-500/50 rounded-xl text-slate-300 hover:text-white font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 group"
+                >
+                  Developer: Use Demo Account <ArrowLeft className="w-3 h-3 rotate-180 group-hover:translate-x-1 transition-transform" />
+                </button>
               </div>
             )}
 
-            <p className="text-slate-500 text-xs font-medium text-center px-4 leading-relaxed">
-              Use your authorized institution Google account to access clinical records.
+            <p className="text-slate-500 text-[10px] font-medium text-center px-4 leading-relaxed italic opacity-60">
+              Note: Google OAuth requires authorized origins. Use Demo account if your local port is not registered.
             </p>
           </div>
           
