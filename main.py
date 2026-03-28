@@ -1,9 +1,10 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 from pydantic import BaseModel
 import uuid
 import io
@@ -13,6 +14,8 @@ pytesseract.pytesseract.tesseract_cmd = "/opt/homebrew/bin/tesseract"
 # Import database and services
 from db import connect_db, get_db
 from services.parser import extract_text
+from services.auth import router as auth_router
+from routes.preauth_routes import router as preauth_router
 from services.extractor import extract_entities
 from services.fhir import build_fhir_bundle
 from services.reconciler import reconcile
@@ -20,11 +23,9 @@ from services.claim_structurer import structure_claim
 from services.validator import validate_bundle
 from services.pdf_parser import extract_text_from_pdf, extract_pages_from_pdf
 from services.patient_splitter import split_patients_via_groq, extract_patient_from_page
-from services.auth import router as auth_router
 import time
 
-# Load .env file on startup
-load_dotenv()
+# .env loaded at top of file
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -49,6 +50,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix="/api/auth")
+app.include_router(preauth_router, prefix="/api/preauth")
 
 # Pydantic models for request bodies
 class ExtractRequest(BaseModel):

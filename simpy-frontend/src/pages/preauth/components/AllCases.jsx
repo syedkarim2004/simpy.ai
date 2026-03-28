@@ -1,180 +1,226 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
+  FolderOpen, 
   Search, 
   Filter, 
-  MoreHorizontal, 
   Eye, 
-  FileText, 
-  CheckCircle2, 
+  CheckCircle, 
   AlertTriangle, 
   XCircle,
-  ExternalLink
+  X,
+  Clock,
+  User,
+  Activity
 } from 'lucide-react';
 import AuditResult from './AuditResult';
 
+const STATUS_CONFIG = {
+  'Approve': { color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/20', icon: CheckCircle },
+  'Review': { color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/20', icon: AlertTriangle },
+  'Reject': { color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/20', icon: XCircle }
+};
+
+const RISK_CONFIG = {
+  'Low': { color: 'text-emerald-400' },
+  'Medium': { color: 'text-amber-400' },
+  'High': { color: 'text-red-400' }
+};
+
 export default function AllCases() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [viewingCase, setViewingCase] = useState(null);
+  const [cases, setCases] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCase, setSelectedCase] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const mockCases = [
-    {
-      patient_id: "SIMPY-UID-001",
-      admission_id: "ADM-9842",
-      patient_name: "Rahul Sharma",
-      icd_code: "I10",
-      diagnosis: "Essential (primary) hypertension",
-      decision: "Approve",
-      risk_level: "Low",
-      completeness_score: 95,
-      date: "2024-03-27",
-      insurance_provider: "Star Health",
-      proposed_treatment: "Medical management and stabilization"
-    },
-    {
-      patient_id: "SIMPY-UID-015",
-      admission_id: "ADM-7215",
-      patient_name: "Anita Verma",
-      icd_code: "E11.9",
-      diagnosis: "Type 2 diabetes mellitus without complications",
-      decision: "Review",
-      risk_level: "Medium",
-      completeness_score: 62,
-      date: "2024-03-26",
-      insurance_provider: "Apollo Munich",
-      proposed_treatment: "Insulin titration and monitoring",
-      missing_fields: ["HbA1c Report", "Previous Hospitalization Records"],
-      suggestions: ["Request last 3 months sugar logs", "Verify insulin prescription authenticity"]
-    },
-    {
-      patient_id: "SIMPY-UID-042",
-      admission_id: "ADM-3310",
-      patient_name: "George Kutty",
-      icd_code: "N18.9",
-      diagnosis: "Chronic kidney disease, unspecified",
-      decision: "Reject",
-      risk_level: "High",
-      completeness_score: 45,
-      date: "2024-03-25",
-      insurance_provider: "HDFC ERGO",
-      proposed_treatment: "Dialysis and renal transplant consultation",
-      missing_fields: ["Creatinine clearance test", "Renal biopsy report", "TPA authorization"],
-      suggestions: ["Significant clinical documentation gap", "Treatment necessity not fully established"]
+  useEffect(() => {
+    fetchCases();
+  }, []);
+
+  const fetchCases = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/preauth/cases");
+      const data = await res.json();
+      if (data.success) {
+        setCases(data.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch cases:", err);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
-  const filteredCases = mockCases.filter(c => 
-    c.patient_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.admission_id.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredCases = cases.filter(c => 
+    c.patient_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.admission_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.patient_id.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      {/* Table Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="relative group max-w-md w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
+    <div className="space-y-6 animate-in fade-in duration-700">
+      {/* Search and Filters */}
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between pb-2">
+        <div className="relative w-full md:w-96 group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-hover:text-blue-500 transition-colors" />
           <input 
             type="text" 
-            placeholder="Filter by Name, ID or ICD Code..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-[#1E293B] border border-slate-700 rounded-2xl py-3 pl-12 pr-4 text-sm font-medium focus:outline-none focus:border-blue-500 transition-all text-white"
+            placeholder="Search Patient Name or ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-[#1E293B] border border-slate-700 rounded-2xl py-3 pl-12 pr-4 text-sm font-medium text-white focus:outline-none focus:border-blue-500 transition-all shadow-lg"
           />
         </div>
-        <button className="flex items-center justify-center gap-2 px-6 py-3 bg-[#1E293B] border border-slate-700 rounded-2xl text-slate-400 hover:text-white transition-all text-xs font-black uppercase tracking-widest">
-          <Filter className="w-4 h-4" /> Filter Advanced
-        </button>
-      </div>
-
-      {/* Table */}
-      <div className="bg-[#1E293B] border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-800/50 border-b border-slate-700">
-                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Patient Details</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">ICD Code</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Audit Decision</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Risk</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Score</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {filteredCases.map((c, idx) => (
-                <tr key={idx} className="hover:bg-blue-600/5 transition-colors cursor-default group">
-                  <td className="px-6 py-5">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-black text-white group-hover:text-blue-400 transition-colors uppercase tracking-tight">{c.patient_name}</span>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] font-bold text-slate-500">{c.admission_id}</span>
-                        <span className="w-1 h-1 rounded-full bg-slate-700" />
-                        <span className="text-[10px] font-bold text-slate-500 tracking-tighter">{c.date}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-5">
-                    <span className="px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded text-[10px] font-black">{c.icd_code}</span>
-                  </td>
-                  <td className="px-6 py-5 text-center">
-                    <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                      c.decision === 'Approve' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
-                      c.decision === 'Review' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
-                      'bg-red-500/10 border-red-500/20 text-red-400'
-                    }`}>
-                      {c.decision}D
-                    </span>
-                  </td>
-                  <td className="px-6 py-5 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                       <span className={`w-2 h-2 rounded-full ${
-                         c.risk_level === 'Low' ? 'bg-emerald-500' :
-                         c.risk_level === 'Medium' ? 'bg-amber-500' : 'bg-red-500'
-                       }`} />
-                       <span className="text-xs font-bold text-white uppercase tracking-widest">{c.risk_level}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-5 text-center">
-                    <span className={`text-sm font-black italic tracking-tighter ${
-                      c.completeness_score >= 80 ? 'text-emerald-500' :
-                      c.completeness_score >= 60 ? 'text-amber-500' : 'text-red-500'
-                    }`}>
-                      {c.completeness_score}%
-                    </span>
-                  </td>
-                  <td className="px-6 py-5 text-right">
-                    <button 
-                      onClick={() => setViewingCase(c)}
-                      className="p-2.5 bg-slate-800 hover:bg-blue-600 text-slate-400 hover:text-white rounded-xl transition-all shadow-lg border border-slate-700"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex items-center gap-3">
+          <button className="flex items-center gap-2 px-4 py-3 bg-[#1E293B] border border-slate-700 rounded-2xl text-xs font-bold text-slate-400 hover:text-white hover:border-slate-500 transition-all uppercase tracking-widest active:scale-95">
+            <Filter className="w-4 h-4" /> Filter
+          </button>
         </div>
       </div>
 
-      {/* View Modal */}
-      {viewingCase && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-[#020617]/90 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-[#0F172A] w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-3xl border border-slate-800 shadow-2xl p-10 relative custom-scrollbar">
-            <button 
-              onClick={() => setViewingCase(null)}
-              className="absolute top-8 right-8 p-3 bg-slate-800 hover:bg-slate-700 rounded-2xl text-slate-400 hover:text-white transition-all z-10"
-            >
-              <XCircle className="w-6 h-6" />
-            </button>
-            <div className="mb-10">
-              <div className="flex items-center gap-4 mb-2">
-                <FileText className="w-6 h-6 text-blue-500" />
-                <h2 className="text-2xl font-black text-white uppercase tracking-tighter italic">Detailed Audit Evidence</h2>
-              </div>
-              <p className="text-slate-500 font-medium text-sm">Full clinical validation records for admission {viewingCase.admission_id}</p>
+      {/* Main Table Container */}
+      <div className="bg-[#1E293B] border border-slate-700 rounded-3xl overflow-hidden shadow-2xl">
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center p-20 gap-4">
+              <Activity className="w-12 h-12 text-blue-500 animate-pulse" />
+              <p className="text-slate-500 font-bold uppercase tracking-[0.2em] text-[10px]">Retrieving Audit History...</p>
             </div>
-            <AuditResult result={viewingCase} />
+          ) : filteredCases.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-20 text-center gap-4">
+              <FolderOpen className="w-12 h-12 text-slate-700 mb-2" />
+              <h3 className="text-xl font-black text-white">No Cases Found</h3>
+              <p className="text-slate-500 text-sm font-medium max-w-xs leading-relaxed">Your audit history is empty. Run a new Pre-Auth Audit to see results here.</p>
+            </div>
+          ) : (
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-[#0F172A] border-b border-slate-800">
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Case ID's</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Patient Details</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Diagnostic (ICD)</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Decision</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Risk</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Audit Score</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Date</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {filteredCases.map((c, i) => (
+                  <tr key={i} className="hover:bg-blue-600/5 transition-colors group">
+                    <td className="px-6 py-5">
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter">{c.patient_id}</p>
+                        <p className="text-[10px] font-black text-violet-500 uppercase tracking-tighter">{c.admission_id}</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center border border-blue-500/10 group-hover:bg-blue-500 group-hover:text-white transition-all duration-300">
+                           <User className="w-4 h-4 text-blue-500 group-hover:text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-white uppercase tracking-tight italic">{c.patient_name}</p>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{c.age}Y • {c.gender}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-center">
+                      <span className="px-3 py-1 bg-slate-800 rounded text-[10px] font-black text-blue-400 border border-slate-700 shadow-sm">{c.icd_code}</span>
+                    </td>
+                    <td className="px-6 py-5">
+                      {(() => {
+                        const s = STATUS_CONFIG[c.decision] || STATUS_CONFIG['Review'];
+                        return (
+                          <div className={`inline-flex items-center gap-2 px-3 py-1.5 ${s.bg} border ${s.border} ${s.color} rounded-lg shadow-sm`}>
+                             <s.icon className="w-3.5 h-3.5" />
+                             <span className="text-[10px] font-black uppercase tracking-widest">{c.decision}</span>
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-6 py-5">
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${(RISK_CONFIG[c.risk_level] || RISK_CONFIG['Medium']).color}`}>
+                        {c.risk_level}
+                      </span>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="space-y-1.5 w-24">
+                        <div className="flex items-center justify-between">
+                          <span className={`text-[10px] font-black italic tracking-tighter ${c.completeness_score >= 80 ? 'text-emerald-500' : c.completeness_score >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                            {c.completeness_score}%
+                          </span>
+                        </div>
+                        <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full ${c.completeness_score >= 80 ? 'bg-emerald-500' : c.completeness_score >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
+                            style={{ width: `${c.completeness_score}%` }}
+                          />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-2 text-slate-500">
+                        <Clock className="w-3 h-3" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">
+                          {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-right">
+                      <button 
+                        onClick={() => setSelectedCase(c)}
+                        className="p-2 transition-all hover:bg-blue-600 rounded-lg group/btn active:scale-90 border border-transparent hover:border-blue-400/50"
+                      >
+                         <Eye className="w-4 h-4 text-blue-500 group-hover:text-white group-hover/btn:scale-110 transition-all" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* Audit Evidence Modal */}
+      {selectedCase && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/90 backdrop-blur-md animate-in fade-in duration-300"
+            onClick={() => setSelectedCase(null)}
+          />
+          <div className="relative w-full max-w-6xl bg-[#0F172A] border border-slate-700 rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-8 border-b border-slate-800 shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-600/20">
+                  <Activity className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight uppercase italic">Audit Evidence</h2>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
+                    System Record: {selectedCase.admission_id} • AI Analysis Generated
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedCase(null)}
+                className="w-12 h-12 bg-slate-800 hover:bg-red-500 text-slate-400 hover:text-white rounded-2xl flex items-center justify-center transition-all duration-300 group"
+              >
+                <X className="w-6 h-6 group-hover:rotate-90 transition-transform" />
+              </button>
+            </div>
+
+            {/* Modal Content - Scrollable */}
+            <div className="overflow-y-auto p-8 custom-scrollbar">
+              <AuditResult result={selectedCase} />
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="p-6 bg-[#172133] border-t border-slate-800 text-center shrink-0">
+              <p className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.5em]">Simpy.ai Health-Audit Protocol • V3.2.1-PROD</p>
+            </div>
           </div>
         </div>
       )}

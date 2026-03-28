@@ -20,13 +20,30 @@ export default function PreauthDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('new-case');
   const [user, setUser] = useState(null);
+  const [cases, setCases] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('simpy_user');
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
+    fetchStats();
   }, []);
+
+  const fetchStats = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/preauth/cases");
+      const data = await res.json();
+      if (data.success) {
+        setCases(data.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch dashboard stats:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.clear();
@@ -42,9 +59,24 @@ export default function PreauthDashboard() {
   ];
 
   const stats = [
-    { label: 'Total Cases', value: '124', color: 'blue', icon: FolderOpen },
-    { label: 'Pending Review', value: '12', color: 'amber', icon: Clock },
-    { label: 'Approved Today', value: '08', color: 'green', icon: CheckCircle },
+    { 
+      label: 'Total Cases', 
+      value: loading ? '...' : String(cases.length).padStart(2, '0'), 
+      color: 'blue', 
+      icon: FolderOpen 
+    },
+    { 
+      label: 'Pending Review', 
+      value: loading ? '...' : String(cases.filter(c => c.decision === 'Review').length).padStart(2, '0'), 
+      color: 'amber', 
+      icon: Clock 
+    },
+    { 
+      label: 'Approved Today', 
+      value: loading ? '...' : String(cases.filter(c => c.decision === 'Approve').length).padStart(2, '0'), 
+      color: 'green', 
+      icon: CheckCircle 
+    },
   ];
 
   return (
