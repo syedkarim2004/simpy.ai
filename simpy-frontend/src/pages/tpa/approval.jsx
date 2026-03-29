@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { differenceInMinutes } from 'date-fns'
+import React, { useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 
 const S = {
   // Layout & Cards
@@ -41,35 +41,106 @@ const MOCK_PATIENTS = [
 ]
 
 export default function Approval() {
+  const { data, loading: globalLoading, moveStage, getTatStatus, getExtraInfo } = useOutletContext()
+  const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('PENDING')
-  const [now, setNow] = useState(new Date())
+  const [selectedCaseId, setSelectedCaseId] = useState(null)
+  const [recommendations, setRecommendations] = useState([]);
 
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 30000)
-    return () => clearInterval(timer)
-  }, [])
+  const stageCases = data?.filter(c => c.stage === 2) || []
+  const activeCase = selectedCaseId ? stageCases.find(c => c.id === selectedCaseId) : null
 
-  const getTATStatus = (submittedAt) => {
-    if (!submittedAt) return { style: S.pillAmber, text: 'Pending' }
-    try {
-      const elapsed = differenceInMinutes(now, new Date(submittedAt))
-      if (elapsed < 45) return { style: S.pillGreen, text: `Within TAT · ${45 - elapsed}m left` }
-      if (elapsed < 60) return { style: S.pillAmber, text: `Approaching · ${60 - elapsed}m left` }
-    } catch (e) {
-      return { style: S.pillAmber, text: 'Unknown' }
+  const generateRecommendations = (data) => {
+    if (!data) {
+      setRecommendations([]);
+      return;
     }
-    return { style: S.pillRed, text: 'Breached' }
+    
+    let recs = [];
+    // APPROVAL LOGIC
+    if (data.estimatedCost > 150000) {
+      recs.push("⚠ High claim amount – consider requesting additional justification");
+    }
+    if (data.tat > 60) {
+      recs.push("🚨 TAT breached – escalate to TPA immediately");
+    }
+    if (data.tpa === "MediAssist") {
+      recs.push("🏥 MediAssist cases usually respond within 1 hour");
+    }
+    if (data.diagnosis?.toLowerCase().includes("fracture")) {
+      recs.push("🦴 Ensure X-ray and orthopedic notes are attached");
+    }
+
+    setTimeout(() => setRecommendations(recs), 400);
+  };
+
+  React.useEffect(() => {
+    generateRecommendations(activeCase);
+  }, [activeCase]);
+
+  const simulateAction = (callback) => {
+    setLoading(true);
+    setTimeout(() => {
+      callback();
+      setLoading(false);
+    }, Math.random() * 800 + 800);
+  };
+
+  const getPillStyle = (res) => ({
+    display: 'inline-block', fontSize: '10px', padding: '3px 8px', borderRadius: '10px', fontWeight: '600', letterSpacing: '0.06em', textTransform: 'uppercase',
+    background: res.bg, color: res.color
+  });
+
+  if (stageCases.length === 0 && activeTab === 'PENDING') {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', background: '#FAFAF7', border: '1px solid #D9D4CB', borderRadius: '8px' }}>
+        <div style={S.headerTitle}>No Pending Approvals</div>
+        <p style={S.headerSub}>All Stage 02 cases have been processed. Total cases: {data?.length || 0}</p>
+      </div>
+    )
   }
 
   return (
     <div>
+      {loading && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          background: "rgba(255,255,255,0.6)",
+          backdropFilter: "blur(4px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 9999
+        }}>
+          <div style={{
+            width: 40,
+            height: 40,
+            border: "4px solid #e5e7eb",
+            borderTop: "4px solid #166534",
+            borderRadius: "50%",
+            animation: "spin 1s linear infinite"
+          }} />
+        </div>
+      )}
+      {globalLoading && (
+        <div style={{ background: '#FEF3C7', padding: '12px 16px', borderRadius: '6px', marginBottom: '24px', color: '#D97706', fontSize: '12px', fontWeight: '600', border: '1px solid #D9D4CB' }}>
+          ⌛ Processing request...
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
           <div style={S.headerLabel}>Stage 02 · TPA Response</div>
           <h1 style={S.headerTitle}>Pre-Auth Approval</h1>
           <p style={S.headerSub}>Track TPA real-time responses, respond to queries, and record authorized amounts.</p>
         </div>
-        <button style={S.btnSecondary} onClick={() => setNow(new Date())}>REFRESH STATUS ↻</button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          {globalLoading && <span style={{ ...S.pillAmber, alignSelf: 'center' }}>Processing...</span>}
+          <button style={S.btnSecondary} disabled={globalLoading || loading}>REFRESH STATUS ↻</button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid #D9D4CB' }}>
@@ -101,19 +172,29 @@ export default function Approval() {
               </tr>
             </thead>
             <tbody>
-              {(MOCK_PATIENTS || []).map(p => {
-                const tat = getTATStatus(p?.submittedAt)
+              {stageCases.map(p => {
+                const tatStatus = getTatStatus(p.tat)
                 return (
-                  <tr key={p?.id || Math.random()}>
+                  <tr key={p.id}>
                     <td style={S.td}>
-                      <div style={{ fontWeight: '600' }}>{p?.name || 'Unknown'}</div>
-                      <div style={{ fontSize: '11px', color: '#6B6560' }}>{p?.uhid || '-'}</div>
+                      <div style={{ fontWeight: '600' }}>{p.patient}</div>
+                      <div style={{ fontSize: '11px', color: '#6B6560' }}>{p.uhid}</div>
                     </td>
-                    <td style={S.td}>{p?.tpa || '-'}</td>
-                    <td style={S.td}>{p?.diagnosis || '-'}</td>
-                    <td style={S.td}><span style={tat.style}>{tat.text}</span></td>
+                    <td style={S.td}>{p.tpa}</td>
+                    <td style={S.td}>{p.diagnosis}</td>
+                    <td style={S.td}><span style={getPillStyle(tatStatus)}>{tatStatus.text} · {p.tat}m</span></td>
                     <td style={S.td}>
-                      <button style={S.btnSecondary}>VIEW →</button>
+                      <button 
+                        style={{ ... (selectedCaseId === p.id ? S.btnPrimary : S.btnSecondary), opacity: loading ? 0.6 : 1 }}
+                        onClick={() => {
+                          simulateAction(() => {
+                            setSelectedCaseId(p.id);
+                          });
+                        }}
+                        disabled={loading}
+                      >
+                        {loading && selectedCaseId === p.id ? 'SELECTING...' : (selectedCaseId === p.id ? 'SELECTED' : 'SELECT')}
+                      </button>
                     </td>
                   </tr>
                 )
@@ -127,15 +208,16 @@ export default function Approval() {
         <span style={S.cardLabel}>Record TPA Authorization Letter</span>
         <div style={S.grid2}>
           <div style={S.formGroup}>
-            <label style={S.label}>Patient Selector</label>
-            <select style={S.select}>
-              <option>Select from pending list...</option>
-              {(MOCK_PATIENTS || []).map(p => <option key={p?.id || Math.random()}>{p?.name} ({p?.uhid})</option>)}
-            </select>
+            <label style={S.label}>Selected Patient</label>
+            <input 
+              style={S.input} 
+              value={activeCase ? `${activeCase.patient} (${activeCase.uhid})` : "Select a patient from the list above"} 
+              disabled 
+            />
           </div>
           <div style={S.formGroup}>
             <label style={S.label}>Authorized Amount ₹</label>
-            <input style={S.input} placeholder="Enter TPA approved amount" />
+            <input style={S.input} defaultValue={activeCase?.estimatedCost?.toLocaleString() || ""} />
           </div>
           <div style={S.formGroup}>
             <label style={S.label}>Auth Letter No.</label>
@@ -147,8 +229,31 @@ export default function Approval() {
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button style={S.btnPrimary}>RECORD APPROVAL → PROCEED TO ADMISSION</button>
+          <button 
+            style={{ ...S.btnPrimary, opacity: globalLoading || loading || !activeCase ? 0.6 : 1, cursor: globalLoading || loading || !activeCase ? 'not-allowed' : 'pointer' }}
+            onClick={() => activeCase && moveStage(activeCase.id, 3)}
+            disabled={globalLoading || loading || !activeCase}
+          >
+            {globalLoading ? 'RECORDING...' : 'RECORD APPROVAL → PROCEED TO ADMISSION'}
+          </button>
         </div>
+
+        {recommendations.length > 0 && (
+          <div style={{
+            marginTop: 20,
+            padding: 15,
+            background: "#fef9c3",
+            borderRadius: 10,
+            border: "1px solid #fde047"
+          }}>
+            <strong style={{ fontSize: '13px', color: '#854d0e', display: 'block', marginBottom: '8px' }}>Smart Suggestions:</strong>
+            <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: '#854d0e' }}>
+              {recommendations.map((rec, i) => (
+                <li key={i} style={{ marginBottom: '4px' }}>{rec}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   )

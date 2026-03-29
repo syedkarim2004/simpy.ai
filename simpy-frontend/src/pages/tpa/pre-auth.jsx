@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 
 const S = {
   // Layout & Cards
@@ -39,11 +40,51 @@ const CHECKLIST = [
 ]
 
 export default function PreAuth() {
-  const [submitted, setSubmitted] = useState(false)
+  const { data, loading, moveStage, getTatStatus } = useOutletContext()
+  const [selectedCaseId, setSelectedCaseId] = useState(null)
   const [items, setItems] = useState(CHECKLIST)
+  const [recommendations, setRecommendations] = useState([]);
+
+  const stageCases = data?.filter(c => c.stage === 1) || []
+  const activeCase = selectedCaseId ? stageCases.find(c => c.id === selectedCaseId) : (stageCases.length > 0 ? stageCases[0] : null)
+
+  const generateRecommendations = (data) => {
+    if (!data) {
+      setRecommendations([]);
+      return;
+    }
+    
+    let recs = [];
+    // PRE-AUTH LOGIC
+    if (data.estimatedCost > 150000) {
+      recs.push("⚠ High claim amount – consider requesting additional justification");
+    }
+    const isEmergency = data.patient === "Rajesh Kumar" // Mocking for now based on data
+    if (isEmergency) {
+      recs.push("⚡ Emergency case – ensure submission within 24 hrs");
+    }
+    if (data.tpa === "MediAssist") {
+      recs.push("🏥 MediAssist usually responds within 1 hour for planned cases");
+    }
+
+    setTimeout(() => setRecommendations(recs), 400);
+  };
+
+  React.useEffect(() => {
+    generateRecommendations(activeCase);
+  }, [activeCase]);
 
   const toggle = (id) => {
     setItems(items.map(item => item.id === id ? { ...item, checked: !item.checked } : item))
+  }
+
+  if (stageCases.length === 0) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', background: '#FAFAF7', border: '1px solid #D9D4CB', borderRadius: '8px' }}>
+        <div style={S.headerTitle}>No Pending Pre-Auths</div>
+        <p style={S.headerSub}>All initial requests have been submitted. Total cases: {data?.length || 0}</p>
+      </div>
+    )
   }
 
   return (
@@ -55,8 +96,31 @@ export default function PreAuth() {
           <h1 style={S.headerTitle}>Pre-Auth Request</h1>
           <p style={S.headerSub}>Initiate cashless claim by submitting clinical details and mandatory documents to the TPA.</p>
         </div>
-        <button style={S.btnPrimary}>SUBMIT TO TPA</button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          {loading && <span style={{ ...S.pillAmber, alignSelf: 'center' }}>Processing...</span>}
+          <button 
+            style={{ ...S.btnPrimary, opacity: loading || !activeCase ? 0.6 : 1, cursor: loading || !activeCase ? 'not-allowed' : 'pointer' }}
+            onClick={() => activeCase && moveStage(activeCase.id, 2)}
+            disabled={loading || !activeCase}
+          >
+            {loading ? 'SUBMITTING...' : 'SUBMIT TO TPA'}
+          </button>
+        </div>
       </div>
+
+      {stageCases.length > 1 && (
+        <div style={{ marginBottom: '24px', display: 'flex', gap: '12px' }}>
+          {stageCases.map(c => (
+            <button 
+              key={c.id} 
+              style={activeCase?.id === c.id ? S.btnPrimary : S.btnSecondary}
+              onClick={() => setSelectedCaseId(c.id)}
+            >
+              {c.patient}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div style={S.alertInfo}>
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -70,39 +134,31 @@ export default function PreAuth() {
           <span style={S.cardLabel}>Patient Information</span>
           <div style={S.formGroup}>
             <label style={S.label}>Patient Full Name</label>
-            <input style={S.input} defaultValue="Rajesh Kumar" />
+            <input style={S.input} value={activeCase?.patient || ""} disabled />
           </div>
           <div style={S.formGroup}>
-            <label style={S.label}>Policy Number</label>
-            <input style={S.input} defaultValue="HDFC-MED-2024-88721" />
+            <label style={S.label}>Policy Number / ID</label>
+            <input style={S.input} value={activeCase?.uhid || ""} disabled />
           </div>
           <div style={S.formGroup}>
             <label style={S.label}>TPA Name</label>
-            <select style={S.select} defaultValue="MediAssist">
-              <option>MediAssist</option>
-              <option>Vidal Health</option>
-              <option>MD India</option>
-            </select>
+            <input style={S.input} value={activeCase?.tpa || ""} disabled />
           </div>
         </div>
 
         <div style={S.card}>
           <span style={S.cardLabel}>Clinical Details</span>
           <div style={S.formGroup}>
-            <label style={S.label}>Diagnosis + ICD-10 Code</label>
-            <input style={S.input} defaultValue="Dengue Fever · A90" />
+            <label style={S.label}>Diagnosis</label>
+            <input style={S.input} value={activeCase?.diagnosis || ""} disabled />
           </div>
           <div style={S.formGroup}>
             <label style={S.label}>Admission Type</label>
-            <select style={S.select} defaultValue="Emergency">
-              <option>Emergency</option>
-              <option>Planned</option>
-              <option>Day Care</option>
-            </select>
+            <input style={S.input} value="Planned" disabled />
           </div>
           <div style={S.formGroup}>
             <label style={S.label}>Estimated Cost ₹</label>
-            <input style={S.input} defaultValue="85,000" />
+            <input style={S.input} value={activeCase?.estimatedCost?.toLocaleString() || "0"} disabled />
           </div>
         </div>
 
@@ -137,21 +193,30 @@ export default function PreAuth() {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
-        <button style={S.btnSecondary}>SAVE DRAFT</button>
+        <button style={S.btnSecondary} disabled={loading}>SAVE DRAFT</button>
         <button 
-          style={S.btnPrimary}
-          onClick={() => setSubmitted(true)}
+          style={{ ...S.btnPrimary, opacity: loading || !activeCase ? 0.6 : 1, cursor: loading || !activeCase ? 'not-allowed' : 'pointer' }}
+          onClick={() => activeCase && moveStage(activeCase.id, 2)}
+          disabled={loading || !activeCase}
         >
-          SUBMIT PRE-AUTH → STAGE 02
+          {loading ? 'PROCESSING...' : 'SUBMIT PRE-AUTH → STAGE 02'}
         </button>
       </div>
 
-      {submitted && (
-        <div style={{ ...S.alertSuccess, marginTop: '24px' }}>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <span style={{ fontSize: '18px' }}>✓</span>
-            <div>Pre-Auth submitted to MediAssist. TAT: 1 hour.</div>
-          </div>
+      {recommendations.length > 0 && (
+        <div style={{
+          marginTop: 20,
+          padding: 15,
+          background: "#fef9c3",
+          borderRadius: 10,
+          border: "1px solid #fde047"
+        }}>
+          <strong style={{ fontSize: '13px', color: '#854d0e', display: 'block', marginBottom: '8px' }}>Smart Suggestions:</strong>
+          <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: '#854d0e' }}>
+            {recommendations.map((rec, i) => (
+              <li key={i} style={{ marginBottom: '4px' }}>{rec}</li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

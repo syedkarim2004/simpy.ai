@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React from 'react'
+import { useOutletContext } from 'react-router-dom'
 
 const S = {
   // Layout & Cards
@@ -39,6 +40,9 @@ const MOCK_UTR_RECEIVED = [
 ]
 
 export default function Settlement() {
+  const { data, loading, moveStage, getExtraInfo } = useOutletContext()
+  const settledCases = data?.filter(c => c.stage === 8) || []
+  const totalAmount = settledCases.reduce((sum, c) => sum + (c.estimatedCost || 0), 0)
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
@@ -47,7 +51,7 @@ export default function Settlement() {
           <h1 style={S.headerTitle}>Final Settlement & UTR</h1>
           <p style={S.headerSub}>Track payments from TPA, reconcile Bank UTRs, and file completed cases.</p>
         </div>
-        <span style={{ ...S.pillAmber, padding: '10px 16px', borderRadius: '6px' }}>₹6.86L Awaited</span>
+        <span style={{ ...S.pillAmber, padding: '10px 16px', borderRadius: '6px' }}>₹{(settledCases.length > 0 ? (totalAmount * 0.9 / 100000).toFixed(2) : "0.00")}L Credited</span>
       </div>
 
       <div style={S.grid2}>
@@ -62,11 +66,11 @@ export default function Settlement() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>Total Claims Settled:</span>
-              <span style={{ fontWeight: '600' }}>32 Cases</span>
+              <span style={{ fontWeight: '600' }}>{settledCases.length} Cases</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>Total Amount Credited:</span>
-              <span style={{ fontWeight: '600', color: '#2D6A4F' }}>₹42.80L</span>
+              <span style={{ fontWeight: '600', color: '#2D6A4F' }}>₹{totalAmount.toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -85,21 +89,24 @@ export default function Settlement() {
             </tr>
           </thead>
           <tbody>
-            {(MOCK_UTR_RECEIVED || []).map(u => (
-              <tr key={u?.id || Math.random()}>
+            {settledCases.map(u => (
+              <tr key={u.id}>
                 <td style={S.td}>
-                  <div style={{ fontWeight: '600' }}>{u?.name || 'Unknown'}</div>
-                  <div style={{ fontSize: '11px', color: '#6B6560' }}>{u?.uhid || '-'}</div>
+                  <div style={{ fontWeight: '600' }}>{u.patient}</div>
+                  <div style={{ fontSize: '11px', color: '#6B6560' }}>{u.uhid}</div>
                 </td>
-                <td style={{ ...S.td, fontFamily: '"DM Mono", monospace' }}>{u?.utr || '-'}</td>
-                <td style={S.td}>₹{(u?.amount || 0).toLocaleString()}</td>
-                <td style={S.td}>{u?.tpa || '-'}</td>
+                <td style={{ ...S.td, fontFamily: '"DM Mono", monospace' }}>UTR-{u.id}XX{u.uhid.split('-').pop()}</td>
+                <td style={S.td}>₹{(u.estimatedCost || 0).toLocaleString()}</td>
+                <td style={S.td}>{u.tpa}</td>
                 <td style={S.td}><span style={S.pillGreen}>CREDITED</span></td>
                 <td style={S.td}>
                   <button style={S.btnSecondary}>Report</button>
                 </td>
               </tr>
             ))}
+            {settledCases.length === 0 && (
+              <tr><td colSpan="6" style={{ ...S.td, textAlign: 'center', color: '#6B6560', padding: '40px' }}>No cases have reached final settlement yet.</td></tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -125,8 +132,14 @@ export default function Settlement() {
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-          <button style={S.btnSecondary}>Download Reconciliation Report</button>
-          <button style={S.btnPrimary}>✓ RECORD UTR & CLOSE CLAIM</button>
+          <button style={S.btnSecondary} disabled={loading}>Download Reconciliation Report</button>
+          <button 
+            style={{ ...S.btnPrimary, opacity: loading || settledCases.length === 0 ? 0.6 : 1 }}
+            onClick={() => settledCases.length > 0 && moveStage(settledCases[0].id, 9)}
+            disabled={loading || settledCases.length === 0}
+          >
+            {loading ? 'CLOSING...' : '✓ RECORD UTR & CLOSE CLAIM'}
+          </button>
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { differenceInMinutes } from 'date-fns'
+import React, { useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 
 const S = {
   // Layout & Cards
@@ -40,26 +40,51 @@ const MOCK_DISCHARGE_QUEUE = [
 ]
 
 export default function Discharge() {
-  const [selectedCase, setSelectedCase] = useState(null)
-  const [now, setNow] = useState(new Date())
+  const { data, loading, moveStage, getTatStatus, getExtraInfo } = useOutletContext()
+  const [selectedCaseId, setSelectedCaseId] = useState(null)
+  const [recommendations, setRecommendations] = useState([]);
 
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 30000)
-    return () => clearInterval(timer)
-  }, [])
+  const dischargeCases = data?.filter(c => c.stage === 6) || []
+  const settlementCases = data?.filter(c => c.stage === 7) || []
+  const activeCase = selectedCaseId ? [...dischargeCases, ...settlementCases].find(c => c.id === selectedCaseId) : null
 
-  const getWindowProgress = (sentAt) => {
-    if (!sentAt) return { text: 'Not Intimated', style: S.pillAmber }
-    try {
-      const elapsed = differenceInMinutes(now, new Date(sentAt))
-      const remaining = 180 - elapsed
-      if (remaining <= 0) return { text: 'Window Breached', style: S.pillAmber }
-      const h = Math.floor(remaining / 60)
-      const m = remaining % 60
-      return { text: `⏱ ${h}h ${m}m left`, style: S.pillGreen }
-    } catch (e) {
-      return { text: 'Unknown', style: S.pillAmber }
+  const generateRecommendations = (data) => {
+    if (!data) {
+      setRecommendations([]);
+      return;
     }
+    
+    let recs = [];
+    const finalBill = (data.estimatedCost * 1.15 || 0);
+    
+    // DISCHARGE LOGIC
+    if (finalBill > 200000) {
+      recs.push("🔍 High final bill – verify all line items carefully before submission");
+    }
+
+    const documentsComplete = true; // Mocking for now
+    if (!documentsComplete) {
+      recs.push("❗ Missing documents – may lead to claim rejection or co-pay increase");
+    }
+
+    if (data.tpa === "MD India") {
+      recs.push("🏥 MD India typically requires the 'Internal Case Paper Summary' (ICPS) for final approval");
+    }
+
+    setTimeout(() => setRecommendations(recs), 400);
+  };
+
+  React.useEffect(() => {
+    generateRecommendations(activeCase);
+  }, [activeCase]);
+
+  if (dischargeCases.length === 0 && settlementCases.length === 0) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', background: '#FAFAF7', border: '1px solid #D9D4CB', borderRadius: '8px' }}>
+        <div style={S.headerTitle}>No Pending Discharges</div>
+        <p style={S.headerSub}>All Stage 06/07 cases have been processed. Total cases: {data?.length || 0}</p>
+      </div>
+    )
   }
 
   return (
@@ -67,39 +92,49 @@ export default function Discharge() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
           <div style={S.headerLabel}>Stage 06–07 · Discharge</div>
-          <h1 style={S.headerTitle}>Discharge & Approval</h1>
+          <h1 style={S.headerTitle}>Discharge Management</h1>
           <p style={S.headerSub}>Manage patient discharge intimations and calculate final TPA vs Patient liabilities.</p>
         </div>
-        <span style={{ ...S.pillAmber, padding: '10px 16px', borderRadius: '6px' }}>⏱ 3 Hr Window</span>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          {loading && <span style={{ ...S.pillAmber, alignSelf: 'center' }}>Processing...</span>}
+          <span style={{ ...S.pillAmber, padding: '10px 16px', borderRadius: '6px' }}>{dischargeCases.length + settlementCases.length} PENDING</span>
+        </div>
       </div>
 
       <div style={{ ...S.card, padding: 0, overflow: 'hidden', marginBottom: '32px' }}>
+        <span style={{ ...S.cardLabel, padding: '16px 16px 0' }}>Discharge & Settlement Pipeline</span>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               <th style={S.th}>Patient / UHID</th>
-              <th style={S.th}>Ward</th>
-              <th style={S.th}>Final Bill</th>
               <th style={S.th}>TPA</th>
-              <th style={S.th}>Window Progress</th>
+              <th style={S.th}>Final Bill</th>
+              <th style={S.th}>Stage</th>
               <th style={S.th}>Action</th>
             </tr>
           </thead>
           <tbody>
-            {(MOCK_DISCHARGE_QUEUE || []).map(p => {
-              const win = getWindowProgress(p?.intimationSentAt)
+            {[...dischargeCases, ...settlementCases].map(p => {
               return (
-                <tr key={p?.id || Math.random()}>
+                <tr key={p.id}>
                   <td style={S.td}>
-                    <div style={{ fontWeight: '600' }}>{p?.name || 'Unknown'}</div>
-                    <div style={{ fontSize: '11px', color: '#6B6560' }}>{p?.uhid || '-'}</div>
+                    <div style={{ fontWeight: '600' }}>{p.patient}</div>
+                    <div style={{ fontSize: '11px', color: '#6B6560' }}>{p.uhid}</div>
                   </td>
-                  <td style={S.td}>{p?.ward || '-'}</td>
-                  <td style={S.td}>₹{(p?.finalBill || 0).toLocaleString()}</td>
-                  <td style={S.td}>{p?.tpa || '-'}</td>
-                  <td style={S.td}><span style={win.style}>{win.text}</span></td>
+                  <td style={S.td}>{p.tpa}</td>
+                  <td style={S.td}>₹{(p.estimatedCost * 1.15 || 0).toLocaleString()}</td>
                   <td style={S.td}>
-                    <button style={S.btnSecondary} onClick={() => setSelectedCase(p)}>Calculate Liability</button>
+                    <span style={p.stage === 6 ? S.pillAmber : S.pillGreen}>
+                      {p.stage === 6 ? 'Stage 06' : 'Stage 07'}
+                    </span>
+                  </td>
+                  <td style={S.td}>
+                    <button 
+                      style={selectedCaseId === p.id ? S.btnPrimary : S.btnSecondary} 
+                      onClick={() => setSelectedCaseId(p.id)}
+                    >
+                      {selectedCaseId === p.id ? 'SELECTED' : 'CALC LIABILTY'}
+                    </button>
                   </td>
                 </tr>
               )
@@ -108,14 +143,14 @@ export default function Discharge() {
         </table>
       </div>
 
-      {selectedCase && (
+      {activeCase && (
         <div style={S.grid2}>
           <div style={S.card}>
-            <span style={S.cardLabel}>Financial Reconciliation</span>
+            <span style={S.cardLabel}>Financial Reconciliation: {activeCase.patient}</span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
                 <span>Total Final Bill:</span>
-                <span style={{ fontWeight: '600' }}>₹{(selectedCase?.finalBill || 0).toLocaleString()}</span>
+                <span style={{ fontWeight: '600' }}>₹{(activeCase.estimatedCost * 1.15 || 0).toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#C0392B' }}>
                 <span>Non-Payable Deductions:</span>
@@ -123,11 +158,11 @@ export default function Discharge() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#C0392B' }}>
                 <span>Co-payment (10%):</span>
-                <span>- ₹{Math.floor((selectedCase?.finalBill || 0) * 0.1).toLocaleString()}</span>
+                <span>- ₹{Math.floor((activeCase.estimatedCost * 1.15 || 0) * 0.1).toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '700', color: '#2D6A4F', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #D9D4CB' }}>
                 <span>TPA Payable Amount:</span>
-                <span>₹{Math.floor((selectedCase?.finalBill || 0) * 0.9 - 1850).toLocaleString()}</span>
+                <span>₹{Math.floor((activeCase.estimatedCost * 1.15 || 0) * 0.9 - 1850).toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -153,8 +188,31 @@ export default function Discharge() {
       )}
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
-        <button style={S.btnPrimary}>✓ RECORD DISCHARGE APPROVAL → STAGE 08</button>
+        <button 
+          style={{ ...S.btnPrimary, opacity: loading || !activeCase ? 0.6 : 1, cursor: loading || !activeCase ? 'not-allowed' : 'pointer' }}
+          disabled={loading || !activeCase}
+          onClick={() => activeCase && moveStage(activeCase.id, activeCase.stage + 1)}
+        >
+          {loading ? 'PROCESSING...' : `RECORD ${activeCase?.stage === 6 ? 'DISCHARGE' : 'SETTLEMENT'} → STAGE 0${activeCase ? activeCase.stage + 1 : 8}`}
+        </button>
       </div>
+
+      {recommendations.length > 0 && (
+        <div style={{
+          marginTop: 20,
+          padding: 15,
+          background: "#fef9c3",
+          borderRadius: 10,
+          border: "1px solid #fde047"
+        }}>
+          <strong style={{ fontSize: '13px', color: '#854d0e', display: 'block', marginBottom: '8px' }}>Smart Suggestions:</strong>
+          <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: '#854d0e' }}>
+            {recommendations.map((rec, i) => (
+              <li key={i} style={{ marginBottom: '4px' }}>{rec}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import StatsBar from '../../components/layout/StatsBar'
 
 const PIPELINE_CARDS = [
@@ -15,6 +15,28 @@ const PIPELINE_CARDS = [
 
 export default function TPADashboard() {
   const navigate = useNavigate()
+  const { data } = useOutletContext()
+
+  const getTag = (stage) => {
+    const stageCases = data?.filter(c => c.stage === stage) || []
+    const count = stageCases.length
+    
+    if (stage === 1) return count > 0 ? `${count} NEW` : 'Entry Point'
+    if (stage === 2) {
+      const breached = stageCases.filter(c => c.tat > 60).length
+      return breached > 0 ? `🚨 ${breached} BREACHED` : (count > 0 ? `${count} PENDING` : '⚡ 1Hr TAT')
+    }
+    if (stage === 3) return count > 0 ? `${count} READY` : 'Admission'
+    if (stage === 4) return count > 0 ? `🚨 ${count} URGENT` : 'Next'
+    if (stage === 5) return count > 0 ? `${count} AWAITING` : 'Pending'
+    if (stage === 6) return count > 0 ? `⏱ ${count} WINDOW` : '3Hr Window'
+    if (stage === 7) return count > 0 ? `${count} TO SETTLE` : 'Next'
+    if (stage === 8) {
+      const amt = stageCases.reduce((s, c) => s + (c.estimatedCost || 0), 0)
+      return amt > 0 ? `₹${(amt / 1000).toFixed(1)}k Due` : 'Settled'
+    }
+    return 'Next'
+  }
 
   return (
     <div>
@@ -83,7 +105,7 @@ export default function TPADashboard() {
                   fontSize: '10px', padding: '3px 8px', borderRadius: '10px',
                   background: '#D8F3DC', color: '#2D6A4F',
                   fontWeight: '600', letterSpacing: '0.06em', textTransform: 'uppercase',
-                }}>{card?.tag || 'Next'}</span>
+                }}>{getTag(Number(card.num))}</span>
               </div>
               <div style={{
                 fontFamily: '"DM Serif Display", Georgia, serif',

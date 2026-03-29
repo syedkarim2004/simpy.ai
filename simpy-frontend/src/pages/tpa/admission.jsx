@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 
 const S = {
   // Layout & Cards
@@ -36,10 +37,25 @@ const CHECKLIST = [
 ]
 
 export default function Admission() {
+  const { data, loading, moveStage, getExtraInfo } = useOutletContext()
+  const [selectedCaseId, setSelectedCaseId] = useState(null)
   const [items, setItems] = useState(CHECKLIST)
+  
+  const stageCases = data?.filter(c => c.stage === 3) || []
+  const activeCase = selectedCaseId ? stageCases.find(c => c.id === selectedCaseId) : (stageCases.length > 0 ? stageCases[0] : null)
+  const extra = activeCase ? getExtraInfo(activeCase.id) : null
 
   const toggle = (id) => {
     setItems(items.map(item => item.id === id ? { ...item, checked: !item.checked } : item))
+  }
+
+  if (stageCases.length === 0) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', background: '#FAFAF7', border: '1px solid #D9D4CB', borderRadius: '8px' }}>
+        <div style={S.headerTitle}>No Pending Admissions</div>
+        <p style={S.headerSub}>All approved cases have been admitted or are in other stages. Total cases: {data?.length || 0}</p>
+      </div>
+    )
   }
 
   return (
@@ -50,7 +66,16 @@ export default function Admission() {
           <h1 style={S.headerTitle}>Patient Admission</h1>
           <p style={S.headerSub}>Formally activate cashless at hospital admission and notify TPA within regulatory timelines.</p>
         </div>
-        <button style={S.btnPrimary}>NOTIFY TPA ↗</button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          {loading && <span style={{ ...S.pillGreen, alignSelf: 'center' }}>Processing...</span>}
+          <button 
+            style={{ ...S.btnPrimary, opacity: loading || !activeCase ? 0.6 : 1, cursor: loading || !activeCase ? 'not-allowed' : 'pointer' }}
+            onClick={() => activeCase && moveStage(activeCase.id, 4)}
+            disabled={loading || !activeCase}
+          >
+            {loading ? 'NOTIFYING...' : 'NOTIFY TPA ↗'}
+          </button>
+        </div>
       </div>
 
       <div style={S.alertWarn}>
@@ -64,16 +89,18 @@ export default function Admission() {
         <div style={S.card}>
           <span style={S.cardLabel}>Admission Details</span>
           <div style={S.formGroup}>
-            <label style={S.label}>Patient Selector</label>
-            <select style={S.select}>
-              <option>Select from pending list...</option>
-              <option>Rajesh Kumar (BH-2024-9921)</option>
-              <option>Priya Sharma (BH-2024-9925)</option>
+            <label style={S.label}>Selected Patient</label>
+            <select 
+              style={S.select} 
+              value={selectedCaseId || activeCase?.id || ""} 
+              onChange={(e) => setSelectedCaseId(Number(e.target.value))}
+            >
+              {stageCases.map(p => <option key={p.id} value={p.id}>{p.patient} ({p.uhid})</option>)}
             </select>
           </div>
           <div style={S.formGroup}>
             <label style={S.label}>Ward / Room No.</label>
-            <input style={S.input} placeholder="e.g. General Ward - 11B" />
+            <input style={S.input} value={extra?.room || ""} disabled />
           </div>
           <div style={S.formGroup}>
             <label style={S.label}>Admission Date & Time</label>
@@ -85,7 +112,7 @@ export default function Admission() {
           <span style={S.cardLabel}>Treating Doctor</span>
           <div style={S.formGroup}>
             <label style={S.label}>Doctor Name</label>
-            <input style={S.input} defaultValue="Dr. Anil Sharma" />
+            <input style={S.input} value={extra?.doctor || ""} disabled />
           </div>
           <div style={S.formGroup}>
             <label style={S.label}>Registration Number</label>
@@ -126,7 +153,13 @@ export default function Admission() {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
-        <button style={S.btnPrimary}>ACTIVATE CASHLESS → STAGE 04</button>
+        <button 
+          style={{ ...S.btnPrimary, opacity: loading || !activeCase ? 0.6 : 1, cursor: loading || !activeCase ? 'not-allowed' : 'pointer' }}
+          onClick={() => activeCase && moveStage(activeCase.id, 4)}
+          disabled={loading || !activeCase}
+        >
+          {loading ? 'ADMITTING...' : 'ACTIVATE CASHLESS → STAGE 04'}
+        </button>
       </div>
     </div>
   )
