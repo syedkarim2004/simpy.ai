@@ -25,6 +25,16 @@
   --font-serif: 'Instrument Serif', serif;
   --font-mono: 'Space Mono', monospace;
   --font-body: 'DM Sans', sans-serif;
+
+  /* TPA SPECIFIC TOKENS */
+  --bg-tpa: #F4F1EC;
+  --surface-tpa: #FAFAF7;
+  --green: #2D6A4F;
+  --green-light: #52B788;
+  --green-pale: #D8F3DC;
+  --border-tpa: #D9D4CB;
+  --text-tpa: #1A1A1A;
+  --muted-tpa: #6B6560;
 }
 
 * { 

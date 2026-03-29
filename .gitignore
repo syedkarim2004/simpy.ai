@@ -37,3 +37,15 @@ data/icd10_codes.json
 # Local
 .vscode/
 package-lock.json
+.DS_Store
+
+# Frontend/Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*
+
+# TPA Specific
+simpy-tpa/frontend/node_modules/
+simpy-frontend/node_modules/

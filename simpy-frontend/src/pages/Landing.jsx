@@ -15,7 +15,8 @@ import {
   Database,
   BarChart3,
   Terminal,
-  Server
+  Server,
+  ClipboardList
 } from 'lucide-react';
 
 /* ── Animation Wrapper ─────────────── */
@@ -139,6 +140,13 @@ export default function Landing() {
               icon: Lock,
               path: "/admin/login",
               delay: 0.3
+            },
+            {
+              title: "TPA Administrator",
+              desc: "End-to-end cashless claim pipeline. Pre-Auth to UTR settlement across MediAssist, Vidal Health & MD India.",
+              icon: ClipboardList,
+              path: "/tpa",
+              delay: 0.4
             }
           ].map((portal, i) => (
             <Reveal key={i} delay={portal.delay}>

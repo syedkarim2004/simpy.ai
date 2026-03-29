@@ -21,6 +21,16 @@ import PDFUpload from './pages/PDFUpload';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 
+// TPA Portal Imports
+import TPALayout from './components/layout/TPALayout';
+import TPADashboard from './pages/tpa/index';
+import PreAuth from './pages/tpa/pre-auth';
+import Approval from './pages/tpa/approval';
+import Admission from './pages/tpa/admission';
+import Enhancement from './pages/tpa/enhancement';
+import Discharge from './pages/tpa/discharge';
+import Settlement from './pages/tpa/settlement';
+
 /* ── Protected route — checks localStorage flag ─────────────── */
 function ProtectedRoute({ children }) {
   const isAuthed = localStorage.getItem('simpy_authed') === 'true';
@@ -85,6 +95,17 @@ function App() {
           <Route path="discharge" element={<DischargeModule />} />
           <Route path="settlement" element={<DischargeModule />} />
           <Route path="preauth" element={<PreauthDashboard />} />
+        </Route>
+
+        {/* ── TPA Administrator Portal ── */}
+        <Route path="/tpa" element={<TPALayout />}>
+          <Route index element={<TPADashboard />} />
+          <Route path="pre-auth" element={<PreAuth />} />
+          <Route path="approval" element={<Approval />} />
+          <Route path="admission" element={<Admission />} />
+          <Route path="enhancement" element={<Enhancement />} />
+          <Route path="discharge" element={<Discharge />} />
+          <Route path="settlement" element={<Settlement />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
