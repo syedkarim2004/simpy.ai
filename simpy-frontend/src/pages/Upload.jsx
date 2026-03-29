@@ -1,24 +1,10 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload as UploadIcon, FileText, CheckCircle2, ChevronRight, FileImage, ShieldCheck } from 'lucide-react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
-
-function TorusKnot() {
-  const meshRef = useRef();
-  
-  useFrame((state, delta) => {
-    meshRef.current.rotation.x += delta * 0.15;
-    meshRef.current.rotation.y += delta * 0.2;
-  });
-
-  return (
-    <mesh ref={meshRef}>
-      <torusKnotGeometry args={[2, 0.6, 128, 32]} />
-      <meshStandardMaterial color="#0D9488" roughness={0.2} metalness={0.7} />
-    </mesh>
-  );
-}
+import { 
+  Upload as UploadIcon, FileText, CheckCircle2, 
+  FileImage, ShieldCheck, Database, Info, 
+  AlertCircle, X, Activity, ArrowRight, CornerDownRight
+} from 'lucide-react';
 
 export default function Upload() {
   const [file, setFile] = useState(null);
@@ -57,11 +43,11 @@ export default function Upload() {
     setError('');
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
     if (!validTypes.includes(selectedFile.type) && !selectedFile.name.match(/\.(pdf|jpe?g|png)$/i)) {
-      setError('Invalid file type. Please upload a PDF, JPG, or PNG.');
+      setError('Unsupported file type. Please upload a PDF or Image (JPG, PNG).');
       return;
     }
     if (selectedFile.size > 10 * 1024 * 1024) {
-      setError('File size must be less than 10MB.');
+      setError('File size exceeds 10MB limit.');
       return;
     }
     setFile(selectedFile);
@@ -79,7 +65,7 @@ export default function Upload() {
     const formData = new FormData();
     formData.append('file', file);
     
-    // Clear stale session data to prevent UI ghosts
+    // Clear stale session data
     localStorage.removeItem('report');
     localStorage.removeItem('entities');
     localStorage.removeItem('fhir_bundle');
@@ -94,13 +80,12 @@ export default function Upload() {
       });
 
       if (!response.ok) {
-        throw new Error(`Upload failed with status ${response.status}`);
+        throw new Error(`API error: ${response.status}`);
       }
 
       const data = await response.json();
       localStorage.setItem('document_id', data.document_id);
       
-      // Add to local history list
       const hData = JSON.parse(localStorage.getItem('doc_history') || '[]');
       hData.unshift({
         id: data.document_id,
@@ -111,147 +96,204 @@ export default function Upload() {
 
       navigate('/app/processing', { state: { document_id: data.document_id } });
     } catch (err) {
-      setError('Upload failed. Please check the backend connection.');
+      setError('Failed to transmit document. Please verify your connection.');
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  const recentDocs = JSON.parse(localStorage.getItem('doc_history') || '[]').slice(0, 3);
-  const mockDocs = recentDocs.length > 0 ? recentDocs : [
-    { filename: 'apollo_lab_results_03.jpg', date: '2 hours ago', score: 98 },
-    { filename: 'tata_memorial_discharge.pdf', date: '5 hours ago', score: 92 },
-    { filename: 'max_health_prescription.pdf', date: '1 day ago', score: 85 }
-  ];
+  const recentDocs = JSON.parse(localStorage.getItem('doc_history') || '[]').slice(0, 4);
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 relative">
-      <div className="flex items-center gap-2 text-sm font-semibold text-slate-400 mb-6 uppercase tracking-widest pl-2">
-        <span>Dashboard</span> <ChevronRight className="w-4 h-4" /> <span className="text-teal">Upload</span>
+    <div className="flex flex-col h-full bg-[var(--bg)] p-6 lg:p-10 font-body transition-all duration-500">
+      
+      {/* Header Section */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-12 gap-6 max-w-[1400px] mx-auto w-full">
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+             <div className="w-1 h-5 bg-[var(--accent)] rounded-full" />
+             <h4 className="font-mono text-[10px] text-[var(--accent)] font-bold uppercase tracking-widest">Document Ingestion</h4>
+          </div>
+          <h1 className="text-[42px] font-serif font-bold text-[var(--text)] leading-none tracking-tight">
+            Clinical Indexing <span className="text-[var(--accent)] italic">Engine</span>
+          </h1>
+          <p className="text-[var(--muted)] text-[14px] mt-4 max-w-[540px] leading-relaxed">
+            Securely upload medical artifacts for real-time clinical extraction, FHIR normalization, and automated reconciliation.
+          </p>
+        </div>
+        
+        <div className="flex gap-4">
+            <div className="bg-white border border-[var(--border)] p-5 rounded-[8px] min-w-[160px] shadow-sm">
+              <span className="block font-mono text-[9px] text-[var(--mid)] font-bold uppercase mb-2">Cycle Volume</span>
+              <span className="text-[28px] font-serif font-bold text-[var(--text)] leading-none">{recentDocs.length > 0 ? recentDocs.length : '—'}</span>
+            </div>
+           <div className="bg-white border border-[var(--border)] p-5 rounded-[8px] min-w-[160px] shadow-sm">
+              <span className="block font-mono text-[9px] text-[var(--mid)] font-bold uppercase mb-2">Core Status</span>
+              <span className="text-[28px] font-serif font-bold text-[var(--accent)] leading-none">Active</span>
+           </div>
+        </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-[1400px] mx-auto w-full flex-1 min-h-0">
         
-        {/* LEFT SIDE: Upload Area (60%) */}
-        <div className="lg:w-[60%] flex flex-col bg-white p-8 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden">
-          
-          <h1 className="text-3xl font-black text-navy mb-2 relative z-10">Document Ingestion</h1>
-          <p className="text-slate-500 font-medium text-sm mb-8 relative z-10">
-            Securely upload PDFs, scanned reports, lab results, and prescriptions for processing.
-          </p>
-
-          <div 
-            className={`border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center transition-all bg-slate-50
-              ${dragActive ? 'border-teal shadow-[inset_0_0_20px_rgba(13,148,136,0.1)]' : 'border-slate-300'}
-              ${!file ? 'cursor-pointer hover:border-teal hover:bg-slate-100' : ''}
-              relative z-10 min-h-[300px]
+        {/* Main Dropzone Area */}
+        <div className="lg:col-span-8 flex flex-col gap-6">
+           <div 
+            className={`relative flex-1 min-h-[400px] border-2 border-dashed transition-all duration-300 rounded-[12px] flex flex-col items-center justify-center p-12 group bg-white shadow-sm
+              ${dragActive ? 'border-[var(--accent)] bg-[var(--accent-light)]' : 'border-[var(--border)] hover:border-[var(--mid)]'}
+              ${!file ? 'cursor-pointer' : ''}
             `}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
             onDrop={handleDrop}
             onClick={() => !file && document.getElementById('file-upload').click()}
-          >
-            <input
+           >
+             <input
               id="file-upload"
               type="file"
               className="hidden"
               accept=".pdf,.jpg,.jpeg,.png"
               onChange={handleChange}
             />
-            
-             <div className="absolute top-4 right-4 flex gap-2">
-                <div className="bg-white p-2 rounded shadow-sm border border-slate-100 flex items-center justify-center text-red-500 tooltip" title="PDF Supported"><FileText className="w-4 h-4"/></div>
-                <div className="bg-white p-2 rounded shadow-sm border border-slate-100 flex items-center justify-center text-blue-500 tooltip" title="Images Supported"><FileImage className="w-4 h-4"/></div>
-             </div>
 
             {!file ? (
-              <>
-                <div className="w-20 h-20 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center mb-6 text-navy transition-transform group-hover:scale-110">
-                  <UploadIcon className="w-10 h-10" />
+              <div className="text-center space-y-6">
+                <div className="w-20 h-20 bg-[var(--surface-alt)] border border-[var(--border)] flex items-center justify-center rounded-[12px] group-hover:scale-105 transition-all text-[var(--mid)] group-hover:text-[var(--accent)] mx-auto">
+                  <UploadIcon size={32} />
                 </div>
-                <p className="text-navy font-black text-xl">Drop your file here</p>
-                <p className="text-slate-500 font-medium text-sm mt-2">or <span className="text-teal hover:underline underline-offset-4 cursor-pointer">click to browse directory</span></p>
-                <p className="text-slate-400 text-xs mt-4">Max file size: 10MB</p>
-              </>
+                <div>
+                  <h3 className="text-[22px] font-serif font-bold text-[var(--text)]">Deposit Artifact</h3>
+                  <p className="text-[var(--muted)] text-[13px] mt-2">
+                    Drag and drop file here, or <span className="text-[var(--accent)] font-bold hover:underline">browse files</span>
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-6 pt-6 text-[var(--mid)]">
+                  <div className="flex items-center gap-2">
+                    <FileText size={16} /> <span className="font-mono text-[9px] font-bold uppercase tracking-wider">PDF</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <FileImage size={16} /> <span className="font-mono text-[9px] font-bold uppercase tracking-wider">Image</span>
+                  </div>
+                </div>
+              </div>
             ) : (
-              <div className="flex flex-col items-center w-full max-w-md bg-white p-6 rounded-xl border border-teal shadow-md relative overflow-hidden group">
-                 <div className="absolute top-0 right-0 w-16 h-16 bg-teal/10 rounded-bl-full z-0 transition-transform group-hover:scale-150"></div>
-                 <ShieldCheck className="w-12 h-12 text-teal mb-4 relative z-10" />
-                 <p className="text-navy font-bold text-lg text-center break-all px-4 relative z-10">{file.name}</p>
-                 <div className="flex items-center gap-4 mt-3 relative z-10">
-                    <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-bold">{formatSize(file.size)}</span>
-                    <span className="bg-teal/10 text-teal px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">{file.type?.split('/')[1] || 'DOC'}</span>
-                 </div>
-                
-                <button 
-                  onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                  className="mt-6 text-sm font-bold text-red-500 hover:text-red-700 transition-colors bg-red-50 px-4 py-2 rounded-lg relative z-10 w-full"
-                  disabled={loading}
-                >
-                  Discard & Select New
-                </button>
+              <div className="w-full max-w-md animate-in zoom-in-95 duration-300">
+                <div className="bg-[var(--surface-alt)] border border-[var(--border)] p-8 rounded-[12px] relative group/file">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                    className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-[var(--mid)] hover:text-[var(--red)] hover:bg-white rounded-full transition-all"
+                  >
+                    <X size={18} />
+                  </button>
+                  
+                  <div className="flex items-center gap-5 mb-6">
+                    <div className="w-14 h-14 bg-white border border-[var(--border)] flex items-center justify-center rounded-[10px] text-[var(--accent)]">
+                      <ShieldCheck size={28} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-mono text-[9px] text-[var(--mid)] font-bold uppercase mb-1">Payload Staged</p>
+                      <h4 className="text-[18px] font-serif font-bold text-[var(--text)] truncate">
+                        {file.name}
+                      </h4>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="flex-1 bg-white border border-[var(--border)] p-3 rounded-[6px] text-center">
+                       <p className="font-mono text-[8px] text-[var(--mid)] font-bold uppercase mb-1">File Size</p>
+                       <p className="text-[var(--text)] font-semibold text-[13px]">{formatSize(file.size)}</p>
+                    </div>
+                    <div className="flex-1 bg-white border border-[var(--border)] p-3 rounded-[6px] text-center">
+                       <p className="font-mono text-[8px] text-[var(--mid)] font-bold uppercase mb-1">Format</p>
+                       <p className="text-[var(--accent)] font-bold text-[13px] uppercase">{file.type?.split('/')[1] || 'DOC'}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
-          </div>
+           </div>
 
-          {error && (
-            <p className="text-red-600 bg-red-50 p-3 rounded-lg border border-red-200 text-sm mt-4 font-bold">{error}</p>
+           {error && (
+            <div className="bg-[var(--red-light)] border border-red-200 p-4 rounded-[8px] flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+              <AlertCircle className="text-[var(--red)]" size={18} />
+              <p className="text-[var(--red)] text-[12px] font-medium">{error}</p>
+            </div>
           )}
 
           <button
             onClick={handleProcess}
             disabled={!file || loading}
-            className={`w-full mt-8 py-4 rounded-xl font-black text-white text-lg tracking-wide transition-all shadow-lg flex items-center justify-center gap-3
+            className={`w-full h-16 rounded-[8px] font-bold text-[16px] uppercase tracking-wider transition-all flex items-center justify-center gap-3 shadow-md
               ${!file || loading 
-                ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' 
-                : 'bg-gradient-to-r from-teal to-[#0f766e] hover:shadow-teal/40 hover:-translate-y-0.5'
+                ? 'bg-[var(--surface-alt)] border border-[var(--border)] text-[var(--mid)] cursor-not-allowed shadow-none' 
+                : 'bg-[var(--accent)] text-white hover:opacity-95 shadow-[var(--accent)]/20'
               }
             `}
           >
             {loading ? (
                <>
-                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                 Uploading...
+                 <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                 Processing Document...
                </>
-            ) : 'Process Document →'}
+            ) : (
+              <>
+                 Execute Clinical Scan <ArrowRight size={20} />
+              </>
+            )}
           </button>
         </div>
 
-        {/* RIGHT SIDE: 3D Visualization & History (40%) */}
-        <div className="hidden lg:flex lg:w-[40%] flex-col gap-6">
-            <div className="h-[350px] rounded-2xl overflow-hidden bg-[#0A1628] shadow-sm border border-slate-200 relative">
-                <div className="absolute inset-0 z-0 opacity-80">
-                <Canvas camera={{ position: [0, 0, 7], fov: 45 }}>
-                    <ambientLight intensity={0.5} />
-                    <directionalLight position={[10, 10, 5]} intensity={1.5} />
-                    <pointLight position={[-10, -10, -10]} intensity={0.5} color="#0D9488" />
-                    <TorusKnot />
-                    <OrbitControls enableZoom={false} autoRotate={false} />
-                </Canvas>
-                </div>
-            </div>
-
-            <div className="flex-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-               <h3 className="text-navy font-bold flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-                 <FileText className="w-5 h-5"/> Recent Documents
-               </h3>
-               <div className="space-y-3">
-                  {mockDocs.map((doc, i) => (
-                      <div key={i} className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200 cursor-pointer">
-                          <div className="flex items-center gap-3">
-                              <div className="bg-blue-50 text-blue-600 p-2 rounded"><FileText className="w-4 h-4"/></div>
-                              <div className="overflow-hidden">
-                                  <p className="text-navy font-bold text-sm truncate max-w-[150px]" title={doc.filename}>{doc.filename}</p>
-                                  <p className="text-slate-500 text-xs font-medium">{doc.date || 'Recently'}</p>
-                              </div>
+        {/* Info & History Panel */}
+        <div className="lg:col-span-4 space-y-6">
+           <div className="bg-white border border-[var(--border)] p-6 rounded-[12px] shadow-sm">
+              <div className="flex items-center gap-3 mb-6">
+                <Database size={18} className="text-[var(--accent)]" />
+                <h3 className="font-serif text-[18px] text-[var(--text)]">Recent Activity</h3>
+              </div>
+              
+              <div className="space-y-4">
+                 {recentDocs.length > 0 ? recentDocs.map((doc, i) => (
+                    <div key={i} className="group flex items-center justify-between p-3 bg-[var(--surface-alt)] rounded-[8px] hover:bg-[var(--accent-light)] transition-colors cursor-pointer">
+                       <div className="min-w-0 pr-4">
+                          <p className="text-[13px] font-semibold text-[var(--text)] truncate">{doc.filename}</p>
+                          <div className="flex items-center gap-3 mt-1">
+                            <span className="font-mono text-[9px] text-[var(--mid)] font-bold uppercase">ID: {doc.id.substring(0, 8)}</span>
+                            <span className="w-1 h-1 bg-[var(--mid)] rounded-full" />
+                            <span className="font-mono text-[9px] text-[var(--mid)] font-bold uppercase">{new Date(doc.date).toLocaleDateString()}</span>
                           </div>
-                          {doc.score && <span className="text-teal bg-teal/10 px-2 py-1 rounded text-xs font-bold">{doc.score}/100</span>}
-                      </div>
-                  ))}
-               </div>
-            </div>
+                       </div>
+                       <CheckCircle2 size={16} className="text-[var(--accent)] shrink-0" />
+                    </div>
+                 )) : (
+                    <div className="text-center py-10 opacity-40">
+                       <Info size={32} className="mx-auto mb-3" />
+                       <p className="font-mono text-[10px] uppercase font-bold text-[var(--mid)]">No records present</p>
+                    </div>
+                 )}
+              </div>
+           </div>
+
+           <div className="bg-[var(--surface-alt)] border border-[var(--border)] p-6 rounded-[12px]">
+              <div className="flex items-center gap-3 mb-6">
+                <Info size={18} className="text-[var(--amber)]" />
+                <h3 className="font-serif text-[18px] text-[var(--text)]">Security Protocol</h3>
+              </div>
+              <ul className="space-y-4">
+                 {[
+                   'End-to-End Encryption Active (AES-256)',
+                   'Automated PII/PHI Redaction Layer',
+                   'LOINC & SNOMED CT Terminology Sync',
+                   'Audit Trail Log Persistence'
+                 ].map((text, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                       <CornerDownRight size={14} className="text-[var(--amber)] mt-0.5 shrink-0" />
+                       <span className="text-[12px] text-[var(--muted)] leading-relaxed">{text}</span>
+                    </li>
+                 ))}
+              </ul>
+           </div>
         </div>
 
       </div>

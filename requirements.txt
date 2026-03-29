@@ -12,3 +12,4 @@ mlx-lm
 fhir.resources
 rapidfuzz
 requests
+openpyxl

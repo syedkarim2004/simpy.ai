@@ -1,17 +1,74 @@
 import json
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 import fitz  # PyMuPDF
 import openpyxl
 from openpyxl.styles import PatternFill, Font, Alignment
 from groq import Groq
 import os
+from .insurance_rules import check_rules_against_case
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# In-memory store for hackathon (pre-populated with 1 case for presentation)
+# In-memory store for hackathon (pre-populated with 3 cases for presentation)
 cases_store = [
+    {
+        "patient_id": "SIMPY-UID-001",
+        "admission_id": "ADM-1001",
+        "patient_name": "John Doe",
+        "age": "45",
+        "gender": "Male",
+        "insurance_provider": "Star Health",
+        "policy_number": "POL-77889",
+        "tpa_name": "MediAssist",
+        "diagnosis": "Acute Myocardial Infarction",
+        "icd_code": "I21.9",
+        "proposed_treatment": "Emergency Angioplasty",
+        "completeness_score": 100,
+        "risk_level": "High",
+        "decision": "Review",
+        "missing_fields": [],
+        "suggestions": ["Verify cardiac biomarkers", "Check for prior stent history"],
+        "reasoning": "High risk due to acute cardiac event",
+        "created_at": (datetime.now() - timedelta(days=2)).isoformat(),
+        "rule_check": {
+            "total_rules": 32,
+            "passed": 28,
+            "failed": 2,
+            "warnings": 2,
+            "rule_score": 88,
+            "results": []
+        }
+    },
+    {
+        "patient_id": "SIMPY-UID-002",
+        "admission_id": "ADM-1002",
+        "patient_name": "Jane Smith",
+        "age": "32",
+        "gender": "Female",
+        "insurance_provider": "HDFC Ergo",
+        "policy_number": "POL-11223",
+        "tpa_name": "United Health",
+        "diagnosis": "Appendicitis",
+        "icd_code": "K35.8",
+        "proposed_treatment": "Laparoscopic Appendectomy",
+        "completeness_score": 100,
+        "risk_level": "Low",
+        "decision": "Approve",
+        "missing_fields": [],
+        "suggestions": ["Confirm NPO status", "Standard surgical protocols"],
+        "reasoning": "Standard emergency procedure with no complications",
+        "created_at": (datetime.now() - timedelta(days=1)).isoformat(),
+        "rule_check": {
+            "total_rules": 32,
+            "passed": 31,
+            "failed": 0,
+            "warnings": 1,
+            "rule_score": 97,
+            "results": []
+        }
+    },
     {
         "patient_id": "SIMPY-UID-101",
         "admission_id": "ADM-2024",
@@ -39,13 +96,14 @@ cases_store = [
 ]
 patient_counter = [102]
 admission_counter = [2025]
+enhancement_store = []
 
-def generate_patient_id():
+def generate_patient_id() -> str:
     pid = f"SIMPY-UID-{str(patient_counter[0]).zfill(3)}"
     patient_counter[0] += 1
     return pid
 
-def generate_admission_id():
+def generate_admission_id() -> str:
     aid = f"ADM-{str(admission_counter[0]).zfill(4)}"
     admission_counter[0] += 1
     return aid
@@ -57,8 +115,8 @@ def extract_pdf_text(pdf_path: str) -> str:
         text += page.get_text()
     return text
 
-def validate_fields(patient_name, age, gender, insurance_provider, 
-                    policy_number, tpa_name, pdf_text):
+def validate_fields(patient_name: str, age: str, gender: str, insurance_provider: str, 
+                    policy_number: str, tpa_name: str, pdf_text: str):
     required = {
         "patient_name": patient_name,
         "age": str(age),
@@ -67,7 +125,7 @@ def validate_fields(patient_name, age, gender, insurance_provider,
         "policy_number": policy_number,
         "tpa_name": tpa_name,
     }
-    missing = [k for k, v in required.items() if not v or v.strip() == ""]
+    missing = [k for k, v in required.items() if not v or (isinstance(v, str) and v.strip() == "")]
     
     # Check PDF for key medical fields
     pdf_fields = {
@@ -87,8 +145,10 @@ def validate_fields(patient_name, age, gender, insurance_provider,
     
     return missing, score
 
-def analyze_with_groq(patient_name, age, gender, insurance_provider,
-                       tpa_name, pdf_text, missing, score):
+def analyze_with_groq(patient_name: str, age: str, gender: str, insurance_provider: str,
+                       tpa_name: str, pdf_text: str, missing: list, score: int) -> dict:
+    
+    pdf_snippet = pdf_text[:1500] if pdf_text else ""
     
     prompt = f"""You are a senior healthcare pre-authorization auditor.
 
@@ -100,7 +160,7 @@ Patient Information:
 - TPA: {tpa_name}
 
 Extracted PDF Content (first 1500 chars):
-{pdf_text[:1500]}
+{pdf_snippet}
 
 Validation Results:
 - Completeness Score: {score}%
@@ -125,7 +185,7 @@ Decision rules:
 Return ONLY the JSON object, no other text."""
 
     response = client.chat.completions.create(
-        model="llama3-8b-8192",
+        model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.1,
         max_tokens=500
@@ -149,6 +209,123 @@ Return ONLY the JSON object, no other text."""
             "suggestions": ["AI analysis failed to parse. Please review manually."],
             "reasoning": "Parse error in AI response"
         }
+
+def run_enhancement_audit(
+    admission_id: str, patient_name: str, age: str, gender: str,
+    insurance_provider: str, tpa_name: str, 
+    original_approved_amt: float, enhancement_amt: float, 
+    reason: str, pdf_path: str
+) -> dict:
+    pdf_text: str = extract_pdf_text(pdf_path)
+    
+    pdf_snippet = pdf_text[:1500] if pdf_text else ""
+    
+    prompt = f"""You are a senior TPA enhancement auditor.
+
+Original Case: Admission ID {admission_id}
+Patient: {patient_name}, {age}Y, {gender}
+Insurance: {insurance_provider}, TPA: {tpa_name}
+Original Approved Amount: Rs. {original_approved_amt}
+Enhancement Requested: Rs. {enhancement_amt}
+Reason for Enhancement: {reason}
+
+Discharge Summary / Additional Docs (extracted):
+{pdf_snippet}
+
+Analyze this enhancement request and return ONLY valid JSON:
+{{
+  "enhancement_decision": "Approve or Review or Reject",
+  "approved_enhancement_amt": "amount in numbers only",
+  "copay_amount": "patient copay in numbers",
+  "tpa_payable": "TPA payable amount in numbers",
+  "deductions": "any deductions with reason",
+  "risk_level": "Low or Medium or High",
+  "suggestions": ["suggestion 1", "suggestion 2"],
+  "reasoning": "one line explanation"
+}}
+
+Rules:
+- Approve if documentation complete and amount justified
+- Review if partial docs or borderline amount
+- Reject if no clinical justification or excessive amount
+- TPA payable = Enhancement amt - copay - deductions"""
+
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.1,
+        max_tokens=500
+    )
+    content = response.choices[0].message.content.strip()
+    match = re.search(r'\{.*\}', content, re.DOTALL)
+    if match:
+        content = match.group(0)
+    ai_result = json.loads(content)
+    
+    enhancement_report = {
+        "admission_id": admission_id,
+        "enhancement_id": f"ENH-{str(len(enhancement_store)+1).zfill(3)}",
+        "patient_name": patient_name,
+        "insurance_provider": insurance_provider,
+        "tpa_name": tpa_name,
+        "original_approved_amt": original_approved_amt,
+        "enhancement_requested_amt": enhancement_amt,
+        "enhancement_decision": ai_result.get("enhancement_decision"),
+        "approved_enhancement_amt": ai_result.get("approved_enhancement_amt"),
+        "copay_amount": ai_result.get("copay_amount"),
+        "tpa_payable": ai_result.get("tpa_payable"),
+        "deductions": ai_result.get("deductions"),
+        "risk_level": ai_result.get("risk_level"),
+        "suggestions": ai_result.get("suggestions", []),
+        "reasoning": ai_result.get("reasoning"),
+        "created_at": datetime.now().isoformat()
+    }
+    
+    enhancement_store.append(enhancement_report)
+    return enhancement_report
+
+def auto_fill_preauth_form(pdf_path: str) -> dict:
+    pdf_text: str = extract_pdf_text(pdf_path)
+    
+    pdf_snippet = pdf_text[:2000] if pdf_text else ""
+    
+    prompt = f"""You are a medical data extraction AI for healthcare pre-authorization.
+
+Extract ALL patient and clinical information from this document.
+Document content:
+{pdf_snippet}
+
+Return ONLY valid JSON with extracted data:
+{{
+  "patient_name": "full name or empty string",
+  "age": "age as number or empty string",
+  "gender": "Male or Female or Other or empty string",
+  "insurance_provider": "insurance company name or empty string",
+  "policy_number": "policy number or empty string",
+  "tpa_name": "TPA name or empty string",
+  "diagnosis": "primary diagnosis or empty string",
+  "icd_code": "ICD-10 code or empty string",
+  "proposed_treatment": "treatment or procedure or empty string",
+  "doctor_name": "treating doctor or empty string",
+  "hospital_name": "hospital name or empty string",
+  "estimated_cost": "estimated cost in numbers or empty string",
+  "confidence": "High or Medium or Low"
+}}
+
+Extract exactly what is written. Do not guess or hallucinate.
+If a field is not found, return empty string for that field."""
+
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.0,
+        max_tokens=600
+    )
+    content = response.choices[0].message.content.strip()
+    match = re.search(r'\{.*\}', content, re.DOTALL)
+    if match:
+        content = match.group(0)
+    return json.loads(content)
 
 def generate_excel(report: dict) -> bytes:
     wb = openpyxl.Workbook()
@@ -213,8 +390,8 @@ def generate_excel(report: dict) -> bytes:
     buffer.seek(0)
     return buffer.getvalue()
 
-def run_preauth_audit(patient_name, age, gender, insurance_provider,
-                       policy_number, tpa_name, pdf_path):
+def run_preauth_audit(patient_name: str, age: str, gender: str, insurance_provider: str,
+                       policy_number: str, tpa_name: str, pdf_path: str) -> dict:
     
     # Extract PDF
     pdf_text = extract_pdf_text(pdf_path)
@@ -259,5 +436,9 @@ def run_preauth_audit(patient_name, age, gender, insurance_provider,
     
     # Store in memory
     cases_store.append(report)
+    
+    # Rule Check
+    rule_check = check_rules_against_case({**report, "pdf_text": pdf_text})
+    report["rule_check"] = rule_check
     
     return report

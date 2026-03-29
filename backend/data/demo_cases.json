@@ -1,0 +1,32 @@
+[
+  {
+    "case_id": "CASE-101",
+    "patient_name": "Rahul Sharma",
+    "age": 45,
+    "gender": "Male",
+    "diagnosis": "Unstable Angina",
+    "procedure": "Angioplasty",
+    "preauth_approved": 150000,
+    "expected_los": 3
+  },
+  {
+    "case_id": "CASE-102",
+    "patient_name": "Anita Verma",
+    "age": 32,
+    "gender": "Female",
+    "diagnosis": "ACL Tear",
+    "procedure": "Knee Surgery",
+    "preauth_approved": 120000,
+    "expected_los": 2
+  },
+  {
+    "case_id": "CASE-103",
+    "patient_name": "Vikram Singh",
+    "age": 29,
+    "gender": "Male",
+    "diagnosis": "Concussion",
+    "procedure": "Observation",
+    "preauth_approved": 50000,
+    "expected_los": 1
+  }
+]

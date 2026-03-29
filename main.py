@@ -16,6 +16,8 @@ from db import connect_db, get_db
 from services.parser import extract_text
 from services.auth import router as auth_router
 from routes.preauth_routes import router as preauth_router
+from routes.discharge_routes import router as discharge_router
+from routes.pdf_extract_routes import router as pdf_extract_router
 from services.extractor import extract_entities
 from services.fhir import build_fhir_bundle
 from services.reconciler import reconcile
@@ -51,6 +53,8 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/api/auth")
 app.include_router(preauth_router, prefix="/api/preauth")
+app.include_router(discharge_router, prefix="/api")
+app.include_router(pdf_extract_router, prefix="/api")
 
 # Pydantic models for request bodies
 class ExtractRequest(BaseModel):

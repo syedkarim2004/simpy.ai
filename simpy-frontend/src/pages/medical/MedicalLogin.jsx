@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Stethoscope, Lock, ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
+import { AlertCircle, Loader2, Plus, ArrowLeft } from 'lucide-react';
 
 export default function MedicalLogin() {
   const navigate = useNavigate();
@@ -28,7 +28,6 @@ export default function MedicalLogin() {
         localStorage.setItem("simpy_portal", "medical");
         localStorage.setItem("simpy_authed", "true");
         localStorage.setItem("simpy_token", credentialResponse.credential);
-        // Redirect to medical dashboard as requested
         window.location.href = "http://localhost:5173/app";
       } else {
         setError(data.error || 'Authentication failed. Please try again.');
@@ -45,99 +44,86 @@ export default function MedicalLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Background Decor */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(16,185,129,0.05)_0%,rgba(2,6,23,1)_100%)]" />
-      <div 
-        className="absolute inset-0 opacity-[0.02]" 
-        style={{ 
-          backgroundImage: 'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
-          backgroundSize: '40px 40px' 
-        }} 
-      />
-
-      <div className="relative z-10 w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <div className="bg-[#0F172A] border border-slate-800 rounded-3xl p-10 shadow-2xl overflow-hidden relative">
-          {/* Subtle Glow */}
-          <div className="absolute -top-24 -right-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl" />
-          
-          <div className="flex flex-col items-center text-center mb-10">
-            <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/20 transition-transform hover:scale-110 duration-500">
-              <Stethoscope className="w-8 h-8 text-white" />
-            </div>
-            
-            <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Medical Team Portal</h2>
-            <p className="text-slate-400 font-medium">Standardized Clinical Access</p>
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center p-6 font-body">
+      <div className="w-full max-w-[440px] bg-white border border-[var(--border)] p-10 rounded-[8px] shadow-sm relative overflow-hidden text-[var(--text)]">
+        
+        <div className="flex flex-col items-center text-center mb-8">
+          <div className="w-[48px] h-[48px] bg-[var(--accent)] rounded-[10px] flex items-center justify-center mb-6">
+            <Plus size={24} className="text-white" />
           </div>
-
-          <div className="flex flex-col items-center justify-center space-y-6">
-            {error && (
-              <div className="w-full bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                <p className="text-sm font-medium leading-relaxed">{error}</p>
-              </div>
-            )}
-
-            {loading ? (
-              <div className="flex flex-col items-center gap-4 py-8">
-                <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
-                <p className="text-emerald-500 font-black uppercase tracking-widest text-xs">Authenticating...</p>
-              </div>
-            ) : (
-              <div className="w-full space-y-4">
-                <div className="w-full flex justify-center py-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors">
-                  <GoogleLogin
-                    onSuccess={handleGoogleSuccess}
-                    onError={handleGoogleError}
-                    theme="filled_blue"
-                    shape="pill"
-                    width="100%"
-                  />
-                </div>
-                
-                <div className="relative flex items-center py-2 px-2">
-                  <div className="flex-grow border-t border-slate-800"></div>
-                  <span className="flex-shrink mx-4 text-[10px] font-bold text-slate-600 uppercase tracking-widest">or</span>
-                  <div className="flex-grow border-t border-slate-800"></div>
-                </div>
-
-                <button 
-                  onClick={() => {
-                    setLoading(true);
-                    setTimeout(() => {
-                      localStorage.setItem("simpy_user", JSON.stringify({
-                        name: "Demo Physician",
-                        email: "demo@simpy.ai",
-                        picture: "https://api.dicebear.com/7.x/avataaars/svg?seed=physician"
-                      }));
-                      localStorage.setItem("simpy_portal", "medical");
-                      localStorage.setItem("simpy_authed", "true");
-                      localStorage.setItem("simpy_token", "mock_demo_token_123");
-                      window.location.href = "http://localhost:5173/app";
-                    }, 800);
-                  }}
-                  className="w-full py-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-emerald-500/50 rounded-xl text-slate-300 hover:text-white font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 group"
-                >
-                  Developer: Use Demo Account <ArrowLeft className="w-3 h-3 rotate-180 group-hover:translate-x-1 transition-transform" />
-                </button>
-              </div>
-            )}
-
-            <p className="text-slate-500 text-[10px] font-medium text-center px-4 leading-relaxed italic opacity-60">
-              Note: Google OAuth requires authorized origins. Use Demo account if your local port is not registered.
-            </p>
-          </div>
-          
-          <button 
-            onClick={() => navigate('/')}
-            className="w-full mt-10 text-slate-500 font-bold text-xs uppercase tracking-widest hover:text-white transition-colors flex items-center justify-center gap-2"
-          >
-            <ArrowLeft className="w-3 h-3" /> Back to Portal Select
-          </button>
+          <h2 className="font-serif italic text-[22px] text-[var(--text)] leading-tight mb-2">
+            Medical Team Portal
+          </h2>
+          <p className="font-mono text-[10px] text-[var(--muted)] uppercase tracking-[0.15em]">
+            STANDARDIZED CLINICAL ACCESS
+          </p>
         </div>
 
-        <p className="mt-8 text-center text-slate-600 text-[10px] font-bold uppercase tracking-[0.2em]">
-          Secured by SHA-256 & HIPAA Compliant Infrastructure
+        <div className="w-full h-px bg-[var(--border)] mb-10" />
+
+        {error && (
+          <div className="w-full bg-[var(--red-light)] border border-[var(--red)] border-opacity-20 text-[var(--red)] p-4 rounded-[4px] flex items-start gap-3 mb-6 animate-in fade-in">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <p className="text-[13px] font-medium leading-snug">{error}</p>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex flex-col items-center gap-4 py-8">
+            <Loader2 className="w-10 h-10 text-[var(--accent)] animate-spin" />
+            <p className="text-[var(--accent)] font-mono font-bold uppercase tracking-widest text-[10px]">Authenticating...</p>
+          </div>
+        ) : (
+          <div className="w-full space-y-6">
+            <div className="w-full flex justify-center py-1 bg-white border border-[var(--border)] rounded-[4px] overflow-hidden hover:bg-[var(--surface-alt)] transition-colors">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                useOneTap
+                theme="outline"
+                shape="square"
+                width="100%"
+                text="signin_with"
+              />
+            </div>
+            
+            <div className="relative flex items-center py-2">
+              <div className="flex-grow border-t border-[var(--border)]"></div>
+              <span className="flex-shrink mx-4 font-mono text-[9px] text-[var(--mid)] uppercase tracking-widest">or</span>
+              <div className="flex-grow border-t border-[var(--border)]"></div>
+            </div>
+
+            <button 
+              onClick={() => {
+                setLoading(true);
+                setTimeout(() => {
+                  localStorage.setItem("simpy_user", JSON.stringify({
+                    name: "Demo Physician",
+                    email: "demo@simpy.ai",
+                    picture: "https://api.dicebear.com/7.x/avataaars/svg?seed=physician"
+                  }));
+                  localStorage.setItem("simpy_portal", "medical");
+                  localStorage.setItem("simpy_authed", "true");
+                  localStorage.setItem("simpy_token", "mock_demo_token_123");
+                  window.location.href = "http://localhost:5173/app";
+                }, 800);
+              }}
+              className="w-full h-[46px] bg-white border border-[var(--border)] hover:border-[var(--accent)] text-[var(--muted)] hover:text-[var(--accent)] font-mono font-bold text-[10px] uppercase tracking-[0.1em] rounded-[4px] transition-all flex items-center justify-center gap-2 group"
+            >
+              DEVELOPER: USE DEMO ACCOUNT <span className="text-lg">→</span>
+            </button>
+          </div>
+        )}
+
+        <button 
+          onClick={() => navigate('/')}
+          className="w-full mt-10 font-mono text-[9px] text-[var(--muted)] uppercase tracking-widest hover:text-[var(--text)] transition-colors text-center flex items-center justify-center gap-2"
+        >
+          <ArrowLeft size={12} /> BACK TO PORTAL SELECT
+        </button>
+
+        <p className="mt-12 text-center text-[var(--mid)] font-mono text-[9px] uppercase tracking-[0.2em] leading-relaxed">
+          SECURED BY SHA-256 & HIPAA COMPLIANT INFRASTRUCTURE
         </p>
       </div>
     </div>

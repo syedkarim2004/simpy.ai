@@ -1,57 +1,135 @@
-import { NavLink } from 'react-router-dom';
-import { Upload, Activity, FileText, Clock, HeartPulse } from 'lucide-react';
+import React from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { 
+  Plus, LayoutGrid, Clock, CheckCircle2, XCircle, 
+  Upload, Scissors, FileText, Database, ShieldAlert, 
+  Settings, LogOut, Activity, BarChart3, Layers, Menu
+} from 'lucide-react';
 
-export default function Sidebar() {
-  const navLinks = [
+export default function Sidebar({ isOpen, onToggle }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isPreauth = location.pathname.includes('/preauth');
+
+  const user = JSON.parse(localStorage.getItem('simpy_user') || '{}');
+  const userInitials = (user.name || 'DE').substring(0, 2).toUpperCase();
+
+  const navItems = isPreauth ? [
+    { name: 'Dashboard', path: '/app/preauth?tab=new-case', icon: LayoutGrid },
+    { name: 'All Cases', path: '/app/preauth?tab=all-cases', icon: Database },
+    { name: 'Pending Review', path: '/app/preauth?tab=pending', icon: Clock },
+    { name: 'Compliance Tech', path: '/app/preauth?tab=compliance', icon: Activity },
+  ] : [
     { name: 'Upload Document', path: '/app', icon: Upload },
     { name: 'Processing', path: '/app/processing', icon: Activity },
     { name: 'Report', path: '/app/report', icon: FileText },
-    { name: 'History', path: '/app/history', icon: Clock },
-    { name: 'Multi-Patient', path: '/app/multi-patient', icon: HeartPulse },
+    { name: 'History', path: '/app/history', icon: Database },
+    { name: 'Multi-Patient', path: '/app/multi-patient', icon: Layers },
+    { name: 'PDF Auto-Extract', path: '/app/pdf-upload', icon: Scissors },
+    { name: 'Discharge Audit', path: '/app/discharge', icon: ShieldAlert },
+    { name: 'Final Settlement', path: '/app/settlement', icon: BarChart3 },
   ];
 
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate('/');
+  };
+
   return (
-    <div className="w-[260px] h-full flex-shrink-0 bg-navy border-r border-slate-800 flex flex-col z-50 transition-all">
-      {/* 1. Logo at top */}
-      <div className="p-6 border-b border-slate-800/60">
-        <div className="flex items-center gap-2">
-          <HeartPulse className="w-6 h-6 text-teal" />
-          <span className="text-white font-black text-xl tracking-wide">Simpy.ai</span>
+    <div className={`${isOpen ? 'w-[240px]' : 'w-[80px]'} h-screen bg-white border-r border-[var(--border)] flex flex-col fixed left-0 top-0 z-50 transition-all duration-300 overflow-hidden`}>
+      {/* ── LOGO AREA ── */}
+      <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
+        <div className="flex items-center gap-3 overflow-hidden">
+          <div className="w-8 h-8 bg-[var(--accent)] rounded-[6px] flex items-center justify-center shrink-0">
+            <Activity size={18} className="text-white" />
+          </div>
+          {isOpen && (
+            <div className="animate-in fade-in duration-500">
+              <h1 className="font-serif text-[16px] text-[var(--text)] leading-none font-bold">Simpy.ai</h1>
+              <p className="font-mono text-[9px] text-[var(--muted)] uppercase tracking-wider mt-1">
+                {isPreauth ? 'PRE-AUTH AUDIT' : 'WORKSPACE'}
+              </p>
+            </div>
+          )}
         </div>
-        <div className="text-slate-400 text-xs pl-8 mt-1 font-bold tracking-widest uppercase">
-          Workspace
-        </div>
+        <button 
+          onClick={onToggle}
+          className="p-1.5 hover:bg-[var(--surface-alt)] rounded-md text-[var(--muted)] hover:text-[var(--text)] transition-colors"
+        >
+          <Menu size={18} />
+        </button>
       </div>
 
-      {/* 2. Navigation links */}
-      <nav className="flex-1 px-4 mt-6 space-y-2">
-        {navLinks.map((link) => {
-          const Icon = link.icon;
+      {/* ── NEW CASE BUTTON ── */}
+      <div className="px-4 py-4">
+        <button 
+          onClick={() => navigate('/app/preauth?tab=new-case')}
+          className={`flex items-center justify-center gap-2 bg-[var(--accent)] text-white p-[10px] rounded-[6px] font-body text-[13px] font-semibold hover:opacity-90 transition-all ${isOpen ? 'w-full' : 'w-10 mx-auto'}`}
+        >
+          <Plus size={16} /> 
+          {isOpen && <span className="animate-in fade-in duration-300">New Case</span>}
+        </button>
+      </div>
+
+      {/* ── NAVIGATION ── */}
+      <nav className="flex-1 overflow-y-auto pt-2">
+        {navItems.map((item) => {
+          const Icon = item.icon;
           return (
             <NavLink
-              key={link.name}
-              to={link.path}
-              end={link.path === '/app'}
+              key={item.name}
+              to={item.path}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-3 rounded-lg transition-all text-sm font-bold ${isActive
-                  ? 'bg-teal text-white shadow-[0_0_15px_rgba(13,148,136,0.2)]'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                }`
+                `flex items-center gap-3 px-[18px] py-[11px] text-[13px] font-medium transition-all border-l-2 ${
+                  isActive 
+                    ? 'text-[var(--text)] bg-[var(--accent-light)] border-[var(--accent)] font-semibold' 
+                    : 'text-[var(--muted)] border-transparent hover:text-[var(--text)] hover:bg-[var(--surface-alt)]'
+                } ${!isOpen ? 'justify-center px-0' : ''}`
               }
+              title={!isOpen ? item.name : ''}
             >
-              <Icon className="w-5 h-5 shrink-0" />
-              {link.name}
+              <Icon size={18} className={!isOpen ? 'shrink-0' : ''} />
+              {isOpen && <span className="animate-in fade-in slide-in-from-left-2 duration-300">{item.name}</span>}
             </NavLink>
           );
         })}
       </nav>
 
-      <div className="px-6 pb-6">
-        <div className="w-full h-px bg-slate-800 mb-6"></div>
-        {/* 4. Bottom section */}
-        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Powered By</p>
-        <div className="text-white font-medium text-sm mt-1.5 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div> MedGemma AI</div>
-        <p className="text-slate-600 text-[10px] mt-2 font-mono">v2.0.0-beta</p>
+      {/* ── BOTTOM AREA ── */}
+      <div className="p-4 border-t border-[var(--border)] mt-auto">
+        {!isPreauth && isOpen && (
+          <div className="mb-6 animate-in fade-in duration-500">
+            <p className="font-mono text-[8px] text-[var(--mid)] uppercase tracking-widest mb-1">POWERED BY</p>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium flex items-center gap-1.5">
+                <div className="w-1 h-1 bg-[var(--accent)] rounded-full animate-pulse" />
+                MedGemma AI
+              </span>
+              <span className="font-mono text-[9px] text-[var(--muted)]">v2.0.0</span>
+            </div>
+          </div>
+        )}
+
+        <div className={`flex items-center gap-3 p-2 mb-4 bg-[var(--surface-alt)] rounded-[6px] transition-all ${!isOpen ? 'justify-center' : ''}`}>
+          <div className="w-8 h-8 bg-[var(--accent)] rounded-full flex items-center justify-center text-white font-mono text-[11px] font-bold shrink-0">
+            {userInitials}
+          </div>
+          {isOpen && (
+            <div className="overflow-hidden animate-in fade-in duration-500">
+              <p className="text-[12px] font-semibold text-[var(--text)] truncate">{user.name || 'Demo Physician'}</p>
+              <p className="font-mono text-[9px] text-[var(--muted)] truncate">cli.uid.0932</p>
+            </div>
+          )}
+        </div>
+
+        <button 
+          onClick={handleLogout}
+          className={`flex items-center justify-center gap-2 py-2.5 border border-[var(--border)] rounded-[4px] font-mono text-[9px] font-bold text-[var(--text)] uppercase hover:bg-[var(--surface-alt)] transition-all ${isOpen ? 'w-full' : 'w-10 mx-auto'}`}
+          title={!isOpen ? 'Logout System' : ''}
+        >
+          <LogOut size={14} /> 
+          {isOpen && <span className="animate-in fade-in duration-300 text-nowrap">LOGOUT SYSTEM</span>}
+        </button>
       </div>
     </div>
   );

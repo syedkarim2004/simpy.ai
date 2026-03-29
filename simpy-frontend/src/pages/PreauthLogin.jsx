@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Lock, ArrowLeft } from 'lucide-react';
+import { Shield, ArrowLeft } from 'lucide-react';
 
 export default function PreauthLogin() {
   const navigate = useNavigate();
@@ -17,60 +17,66 @@ export default function PreauthLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A] flex items-center justify-center p-6 font-sans">
-      <div className="w-full max-w-md bg-[#1E293B] border border-slate-800 rounded-3xl p-10 shadow-2xl relative overflow-hidden group">
-        {/* Decorative elements */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl -mr-32 -mt-32 group-hover:bg-blue-600/20 transition-colors duration-700" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-600/5 rounded-full blur-3xl -ml-24 -mb-24" />
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center p-6 font-body">
+      <div className="w-full max-w-[440px] bg-white border border-[var(--border)] p-10 rounded-[8px] shadow-sm relative overflow-hidden">
         
-        <div className="relative z-10 flex flex-col items-center text-center">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-8 shadow-xl shadow-blue-600/20 group-hover:scale-110 transition-transform duration-500">
-            <Shield className="w-8 h-8 text-white" />
+        <div className="flex flex-col items-center text-center mb-8">
+          <div className="w-[48px] h-[48px] bg-[var(--accent)] rounded-[10px] flex items-center justify-center mb-6">
+            <Shield size={24} className="text-white" />
+          </div>
+          <h2 className="font-serif text-[26px] text-[var(--text)] leading-tight mb-2 tracking-[-0.5px]">
+            PRE-AUTH PORTAL
+          </h2>
+          <p className="font-mono text-[10px] text-[var(--muted)] uppercase tracking-[0.15em]">
+            INTELLIGENT AUDIT ENTRY
+          </p>
+        </div>
+
+        <div className="w-full h-px bg-[var(--border)] mb-10" />
+        
+        <form className="w-full space-y-6" onSubmit={handleLogin}>
+          <div className="space-y-2">
+            <label className="font-mono text-[9px] text-[var(--muted)] uppercase tracking-[0.12em] block">
+              OPERATIONAL ID
+            </label>
+            <input 
+              type="email" 
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="clinician@simpy.ai"
+              className="w-full bg-[var(--surface-alt)] border border-[var(--border)] rounded-[4px] px-[14px] py-[11px] text-[var(--text)] font-body text-[14px] focus:outline-none focus:border-[var(--accent)] transition-colors placeholder-[var(--mid)]"
+            />
           </div>
           
-          <h2 className="text-3xl font-black text-white mb-2 tracking-tighter italic uppercase">Pre-Auth Portal</h2>
-          <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em] mb-10">Intelligent Audit Entry</p>
-          
-          <form className="w-full space-y-5" onSubmit={handleLogin}>
-            <div className="space-y-2 text-left">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Operational ID</label>
-              <input 
-                type="email" 
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="clinician@simpy.ai"
-                className="w-full px-5 py-4 bg-[#0F172A] border border-slate-800 rounded-2xl text-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600/30 transition-all font-medium placeholder-slate-700"
-              />
-            </div>
-            
-            <div className="space-y-2 text-left">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Access Key</label>
-              <input 
-                type="password" 
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-5 py-4 bg-[#0F172A] border border-slate-800 rounded-2xl text-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600/30 transition-all font-medium placeholder-slate-700"
-              />
-            </div>
+          <div className="space-y-2">
+            <label className="font-mono text-[9px] text-[var(--muted)] uppercase tracking-[0.12em] block">
+              ACCESS KEY
+            </label>
+            <input 
+              type="password" 
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full bg-[var(--surface-alt)] border border-[var(--border)] rounded-[4px] px-[14px] py-[11px] text-[var(--text)] font-body text-[14px] focus:outline-none focus:border-[var(--accent)] transition-colors placeholder-[var(--mid)]"
+            />
+          </div>
 
-            <button 
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-2 mt-6 active:scale-95"
-            >
-              Sign In to System <Lock className="w-4 h-4" />
-            </button>
-          </form>
-          
           <button 
-            onClick={() => navigate('/')}
-            className="mt-10 flex items-center gap-2 text-slate-500 font-black text-[10px] uppercase tracking-widest hover:text-white transition-colors group/back"
+            type="submit"
+            className="w-full h-[46px] bg-[var(--accent)] hover:opacity-90 text-white font-mono font-bold text-[11px] uppercase tracking-wider rounded-[4px] transition-all mt-4"
           >
-            <ArrowLeft className="w-4 h-4 group-hover/back:-translate-x-1 transition-transform" /> Back to Selection
+            SIGN IN TO SYSTEM
           </button>
-        </div>
+        </form>
+        
+        <button 
+          onClick={() => navigate('/')}
+          className="w-full mt-10 font-mono text-[9px] text-[var(--muted)] uppercase tracking-widest hover:text-[var(--text)] transition-colors text-center flex items-center justify-center gap-2"
+        >
+          <ArrowLeft size={12} /> BACK TO SELECTION
+        </button>
       </div>
     </div>
   );

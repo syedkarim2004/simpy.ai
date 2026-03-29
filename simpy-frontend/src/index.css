@@ -1,38 +1,135 @@
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
-
-.fhir-grid-bg {
-  background-image:
-    linear-gradient(rgba(29,184,153,0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(29,184,153,0.06) 1px, transparent 1px);
-  background-size: 44px 44px;
-}
-
-@keyframes fhirPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(29,184,153,0.4); }
-  50%       { box-shadow: 0 0 0 5px rgba(29,184,153,0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .fhir-badge { animation: none; }
-  * { transition-duration: 0.01ms !important; }
-}
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@tailwind variants;
 
-@layer utilities {
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #e2e8f0;
-    border-radius: 10px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #cbd5e1;
-  }
+:root {
+  --bg: #f7f6f3;
+  --white: #ffffff;
+  --surface: #ffffff;
+  --surface-alt: #f0efec;
+  --border: #e2dfd9;
+  --text: #1a1815;
+  --muted: #8a857c;
+  --mid: #c8c4bd;
+  --accent: #1d6b4f;
+  --accent-light: #e8f2ed;
+  --accent-border: #c5dfd3;
+  --amber: #b85c2a;
+  --amber-light: #fdf0e8;
+  --amber-border: #f0c8a8;
+  --red: #c0392b;
+  --red-light: #fdf2f2;
+  --blue: #2563eb;
+  --blue-light: #eff6ff;
+  --font-serif: 'Instrument Serif', serif;
+  --font-mono: 'Space Mono', monospace;
+  --font-body: 'DM Sans', sans-serif;
+}
+
+* { 
+  box-sizing: border-box; 
+  margin: 0; 
+  padding: 0; 
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+/* ── Custom Scrollbar ─────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--mid);
+}
+
+/* ── Typography Shortcuts ─────────────── */
+.font-serif { font-family: var(--font-serif); }
+.font-mono { font-family: var(--font-mono); }
+.font-body { font-family: var(--font-body); }
+
+h1, h2, h3, h4, .h-serif {
+  font-family: var(--font-serif);
+}
+
+.mono-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* ── Common UI Elements ─────────────── */
+.card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.card-hover:hover {
+  box-shadow: 0 4px 16px rgba(26,24,21,0.07);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  text-transform: uppercase;
+  border-radius: 4px;
+}
+
+.input-field {
+  width: 100%;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 11px 14px;
+  font-family: var(--font-body);
+  transition: border-color 0.2s ease;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ── Animations ─────────────── */
+@keyframes pulse-green {
+  0% { transform: scale(0.95); opacity: 0.5; }
+  50% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.5; }
+}
+
+.animate-pulse-green {
+  animation: pulse-green 2s infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+
+/* ── Utility ─────────────── */
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

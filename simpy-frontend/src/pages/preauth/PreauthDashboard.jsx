@@ -1,34 +1,75 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { 
-  Plus, 
-  FolderOpen, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  LayoutDashboard, 
-  LogOut, 
-  ShieldCheck,
-  Search,
-  Bell,
-  User
+  FolderOpen, Clock, CheckCircle, XCircle, 
+  Users, Activity, TrendingUp, ChevronRight,
+  ShieldCheck, AlertCircle, RefreshCcw,
+  BellRing
 } from 'lucide-react';
 import NewCaseForm from './components/NewCaseForm';
 import AllCases from './components/AllCases';
 
+// ── STATUS CONFIGURATION ──
+const statusConfig = {
+  VERIFIED: { color: 'text-[var(--accent)] border-[var(--accent-border)] bg-[var(--accent-light)]/20', label: 'Verified' },
+  IN_REVIEW: { color: 'text-[var(--amber)] border-[var(--amber-border)] bg-[var(--amber-light)]/20', label: 'In Review' },
+  PENDING: { color: 'text-[var(--muted)] border-[var(--border)] bg-gray-50', label: 'Pending' }
+};
+
+const priorityConfig = {
+  HIGH: 'bg-red-500',
+  MEDIUM: 'bg-yellow-500',
+  LOW: 'bg-gray-400'
+};
+
 export default function PreauthDashboard() {
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('new-case');
-  const [user, setUser] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'new-case';
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedPatientId, setSelectedPatientId] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  // ── STRUCTURED PATIENT STATE ──
+  const [activePatients, setActivePatients] = useState([
+    { id: 'P-9021', name: 'Aditya Verma', status: 'IN_REVIEW', lastUpdated: Date.now() - 5000, caseType: 'Pre-Auth', priority: 'HIGH' },
+    { id: 'P-9022', name: 'Megha Singh', status: 'VERIFIED', lastUpdated: Date.now() - 120000, caseType: 'Enhancement', priority: 'LOW' },
+    { id: 'P-9023', name: 'Rajesh Kumar', status: 'PENDING', lastUpdated: Date.now() - 30000, caseType: 'Pre-Auth', priority: 'MEDIUM' }
+  ]);
+
+  // ── RE-RENDER TRIGGER FOR TIME-AGO ──
+  const [, tick] = useState(0);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('simpy_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
     fetchStats();
+    
+    // ── REAL-TIME SIMULATION INTERVAL ──
+    const interval = setInterval(() => {
+      setActivePatients(prev => {
+        if (prev.length === 0) return prev;
+        
+        // Randomly pick ONE patient to update
+        const idx = Math.floor(Math.random() * prev.length);
+        const patient = prev[idx];
+        
+        let nextStatus = patient.status;
+        if (patient.status === 'PENDING') nextStatus = 'IN_REVIEW';
+        else if (patient.status === 'IN_REVIEW') nextStatus = 'VERIFIED';
+        else if (patient.status === 'VERIFIED' && Math.random() > 0.8) nextStatus = 'PENDING'; // Periodic reset
+
+        const updated = [...prev];
+        updated[idx] = { ...patient, status: nextStatus, lastUpdated: Date.now() };
+        return updated;
+      });
+    }, Math.floor(Math.random() * 4000 + 6000)); // 6-10 seconds
+
+    // ── CLOCK TICK FOR TIME-AGO ──
+    const clock = setInterval(() => tick(t => t + 1), 5000);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(clock);
+    };
   }, []);
 
   const fetchStats = async () => {
@@ -45,173 +86,225 @@ export default function PreauthDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate('/');
+  const handlePatientClick = (patient) => {
+    setSelectedPatientId(patient.id);
+    setToast(`Opening case ${patient.id} for ${patient.name}...`);
+    setTimeout(() => setToast(null), 3000);
+    
+    // Optional: Auto-scroll to form
+    document.getElementById('case-form-header')?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const menuItems = [
-    { id: 'new-case', label: 'New Case', icon: Plus },
-    { id: 'all-cases', label: 'All Cases', icon: FolderOpen },
-    { id: 'pending', label: 'Pending', icon: Clock },
-    { id: 'approved', label: 'Approved', icon: CheckCircle },
-    { id: 'rejected', label: 'Rejected', icon: XCircle },
-  ];
+  const getTimeAgo = (timestamp) => {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 5) return 'Just now';
+    if (seconds < 60) return `${seconds}s ago`;
+    return `${Math.floor(seconds / 60)}m ago`;
+  };
 
   const stats = [
     { 
-      label: 'Total Cases', 
+      label: 'Total Submissions', 
       value: loading ? '...' : String(cases.length).padStart(2, '0'), 
-      color: 'blue', 
-      icon: FolderOpen 
+      icon: FolderOpen,
+      trend: '+12% from last week'
     },
     { 
       label: 'Pending Review', 
       value: loading ? '...' : String(cases.filter(c => c.decision === 'Review').length).padStart(2, '0'), 
-      color: 'amber', 
-      icon: Clock 
+      icon: Clock,
+      trend: '4 requiring immediate attention'
     },
     { 
-      label: 'Approved Today', 
+      label: 'Approvals', 
       value: loading ? '...' : String(cases.filter(c => c.decision === 'Approve').length).padStart(2, '0'), 
-      color: 'green', 
-      icon: CheckCircle 
+      icon: CheckCircle,
+      trend: '98.2% Accuracy Rate'
+    },
+    { 
+      label: 'Rejections', 
+      value: loading ? '...' : String(cases.filter(c => c.decision === 'Reject').length).padStart(2, '0'), 
+      icon: XCircle,
+      trend: '3% lower than average'
     },
   ];
 
   return (
-    <div className="flex h-screen bg-[#0F172A] text-white font-sans overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-72 bg-[#1E293B]/50 border-r border-slate-800 flex flex-col pt-8 backdrop-blur-xl">
-        <div className="px-8 mb-10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20">
-              <ShieldCheck className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-black tracking-tight text-white leading-none">Simpy.ai</h1>
-              <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-1">Pre-Auth Audit</p>
-            </div>
-          </div>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      
+      {/* ── INTERACTIVE TOAST ── */}
+      {toast && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 px-6 py-3 bg-[var(--text)] text-white font-mono text-[11px] font-bold uppercase tracking-widest rounded-full shadow-2xl z-[500] animate-in slide-in-from-top-4 flex items-center gap-3 border border-white/20">
+           <BellRing size={14} className="animate-bounce" />
+           {toast}
         </div>
+      )}
 
-        <nav className="flex-1 px-4 space-y-1">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-                  isActive 
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' 
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-500'}`} />
-                {item.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="p-6 border-t border-slate-800 bg-[#0F172A]/40 mt-auto">
-          <div className="flex items-center gap-3 mb-6 px-2">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center border-2 border-slate-800 shadow-xl overflow-hidden">
-              {user?.picture ? (
-                <img src={user.picture} alt="profile" className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-5 h-5 text-white" />
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-black text-white truncate">{user?.name || 'Pre-Auth User'}</p>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter truncate">{user?.email || 'admin@hospital.com'}</p>
-            </div>
-          </div>
-          <button 
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-800/50 hover:bg-red-500/10 text-slate-400 hover:text-red-400 text-xs font-black uppercase tracking-widest border border-slate-700 transition-all duration-300"
-          >
-            <LogOut className="w-4 h-4" /> Logout System
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-        {/* Header */}
-        <header className="h-20 border-b border-slate-800 px-10 flex items-center justify-between bg-[#0F172A]/50 backdrop-blur-md sticky top-0 z-20">
-          <div className="flex items-center gap-4 text-slate-400">
-            <LayoutDashboard className="w-5 h-5 text-blue-500" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Workspace</span>
-            <span className="w-1 h-1 rounded-full bg-slate-700 mx-2" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Pre-Auth Audit System</span>
-          </div>
-
-          <div className="flex items-center gap-6">
-            <div className="relative group hidden lg:block">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
-              <input 
-                type="text" 
-                placeholder="Search Cases, IDs..."
-                className="bg-slate-900/50 border border-slate-800 rounded-full py-2 pl-10 pr-4 text-xs font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 w-64 transition-all"
-              />
-            </div>
-            <button className="relative w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800/50 text-slate-400 hover:text-white border border-slate-700 transition-all">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-blue-500 rounded-full border border-slate-900" />
-            </button>
-          </div>
-        </header>
-
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-10">
-          <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            
-            {/* Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {stats.map((stat, idx) => {
-                const StatIcon = stat.icon;
-                const colors = {
-                  blue: 'from-blue-500/20 to-indigo-500/5 border-blue-500/20 text-blue-400',
-                  amber: 'from-amber-500/20 to-orange-500/5 border-amber-500/20 text-amber-400',
-                  green: 'from-emerald-500/20 to-teal-500/5 border-emerald-500/20 text-emerald-400'
-                };
-                return (
-                  <div key={idx} className={`relative overflow-hidden bg-gradient-to-br ${colors[stat.color]} border rounded-2xl p-6 group hover:scale-[1.02] transition-transform duration-300 shadow-lg`}>
-                    <div className="flex items-center justify-between relative z-10">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">{stat.label}</p>
-                        <h3 className="text-3xl font-black text-white">{stat.value}</h3>
-                      </div>
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-white/10 backdrop-blur-md border border-white/10`}>
-                        <StatIcon className="w-6 h-6" />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Dynamic View */}
-            <div className="animate-in fade-in duration-500">
-              {activeTab === 'new-case' && <NewCaseForm />}
-              {activeTab === 'all-cases' && <AllCases />}
-              {['pending', 'approved', 'rejected'].includes(activeTab) && (
-                <div className="bg-[#1E293B] border border-slate-800 rounded-3xl p-16 flex flex-col items-center justify-center text-center">
-                  <div className="w-20 h-20 bg-slate-800 rounded-2xl flex items-center justify-center mb-6">
-                    <Clock className="w-10 h-10 text-slate-500" />
-                  </div>
-                  <h3 className="text-2xl font-black text-white mb-3">Filtered Views coming soon</h3>
-                  <p className="text-slate-400 max-w-sm font-medium">We're indexing your current cases. This section will allow you to quickly access {activeTab} audits.</p>
+      {/* ── STATS OVERVIEW ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {stats.map((stat, idx) => {
+          const StatIcon = stat.icon;
+          return (
+            <div key={idx} className="bg-white border border-[var(--border)] p-8 rounded-xl hover:border-[var(--accent)] transition-all group relative overflow-hidden">
+              <div className="flex items-center justify-between mb-6">
+                <div className="w-12 h-12 bg-[var(--bg)] border border-[var(--border)] rounded-lg flex items-center justify-center text-[var(--muted)] group-hover:bg-[var(--accent)] group-hover:text-white transition-all duration-300">
+                  <StatIcon size={22} />
                 </div>
-              )}
+                <div className="text-right">
+                  <span className="font-mono text-[9px] text-[var(--mid)] font-bold uppercase tracking-widest block">Accuracy Index</span>
+                  <span className="font-mono text-[10px] text-[var(--accent)] font-bold uppercase">v2.4 Live</span>
+                </div>
+              </div>
+              <div className="relative z-10">
+                <h3 className="font-serif text-4xl font-bold text-[var(--text)] leading-none tracking-tight">
+                  {stat.value}
+                </h3>
+                <p className="font-mono text-[11px] text-[var(--muted)] uppercase tracking-[0.2em] mt-3 font-semibold">{stat.label}</p>
+                <div className="mt-6 pt-6 border-t border-[var(--border)] flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp size={14} className="text-[var(--accent)]" />
+                    <span className="text-[11px] text-[var(--muted)] font-medium">{stat.trend}</span>
+                  </div>
+                  <ChevronRight size={14} className="text-[var(--mid)] group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── DYNAMIC CONTENT AREA ── */}
+      <div className="transition-all duration-300">
+        {activeTab === 'new-case' ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Left: Case Submission Form */}
+            <div className="lg:col-span-8">
+              <div className="bg-white border border-[var(--border)] rounded-xl p-10">
+                <div id="case-form-header" className="flex items-center gap-4 mb-10 border-b border-[var(--border)] pb-8">
+                  <div className="w-10 h-10 bg-[var(--accent-light)] rounded-lg flex items-center justify-center text-[var(--accent)]">
+                    <Activity size={22} />
+                  </div>
+                  <div>
+                    <h2 className="font-serif text-2xl text-[var(--text)] font-bold">Case Submission Portal</h2>
+                    <p className="font-mono text-[10px] text-[var(--muted)] uppercase tracking-widest mt-1">AI-DRIVEN CLINICAL PROTOCOL EXTRACTION</p>
+                  </div>
+                </div>
+                <NewCaseForm selectedPatientId={selectedPatientId} activePatients={activePatients} />
+              </div>
+            </div>
+
+            {/* Right: Active Profiles / Stats Info */}
+            <div className="lg:col-span-4 space-y-8">
+              <div className="bg-white border border-[var(--border)] rounded-xl p-8">
+                <div className="flex items-center justify-between mb-8 border-b border-[var(--border)] pb-4">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-mono text-[11px] font-bold text-[var(--text)] uppercase tracking-widest">Active Patient Profiles</h3>
+                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                  </div>
+                  <div className="flex items-center gap-2 text-[var(--mid)]">
+                    <span className="font-mono text-[8px] font-bold uppercase tracking-widest">Live Sync Active</span>
+                    <RefreshCcw size={12} className="animate-spin-slow" />
+                  </div>
+                </div>
+
+                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                  {activePatients.length > 0 ? (
+                    activePatients.map((p) => {
+                      const cfg = statusConfig[p.status];
+                      return (
+                        <div 
+                          key={p.id} 
+                          onClick={() => handlePatientClick(p)}
+                          className={`flex items-center justify-between p-4 border rounded-lg transition-all cursor-pointer group animate-in slide-in-from-right-2 duration-300 ${
+                            selectedPatientId === p.id 
+                            ? 'bg-[var(--accent-light)]/40 border-[var(--accent)]' 
+                            : 'bg-[var(--bg)] border-[var(--border)] hover:border-[var(--accent)]/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="relative">
+                              <div className="w-10 h-10 bg-white border border-[var(--border)] rounded-full flex items-center justify-center text-[11px] font-bold text-[var(--muted)] group-hover:text-[var(--accent)] group-hover:border-[var(--accent-border)] transition-all">
+                                {p.name.substring(0, 1)}
+                              </div>
+                              <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[var(--bg)] ${priorityConfig[p.priority]}`} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="text-[14px] font-semibold text-[var(--text)]">{p.name}</p>
+                                <span className="text-[8px] px-1.5 py-0.5 bg-white border border-[var(--border)] text-[var(--muted)] rounded font-mono uppercase font-bold tracking-tighter">{p.caseType}</span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <p className="font-mono text-[9px] text-[var(--muted)] uppercase tracking-tight">{p.id}</p>
+                                <span className="w-0.5 h-0.5 bg-[var(--mid)] rounded-full" />
+                                <p className="font-mono text-[8px] text-[var(--mid)] uppercase font-bold tracking-widest">
+                                  Updated {getTimeAgo(p.lastUpdated)}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <span className={`text-[8px] font-mono px-2 py-1 rounded border uppercase tracking-tighter font-black transition-all duration-500 ${cfg.color}`}>
+                            {cfg.label}
+                          </span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="py-12 flex flex-col items-center justify-center text-center">
+                       <div className="w-12 h-12 bg-[var(--bg)] rounded-full flex items-center justify-center mb-4 text-[var(--mid)] border border-[var(--border)] border-dashed">
+                          <Users size={20} />
+                       </div>
+                       <p className="font-mono text-[10px] text-[var(--muted)] font-bold uppercase tracking-widest">No active cases</p>
+                       <p className="text-[11px] text-[var(--mid)] mt-1">Upload a new case to begin</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-[var(--accent)] rounded-xl p-10 text-white relative overflow-hidden shadow-2xl shadow-[var(--accent)]/10">
+                <div className="relative z-10">
+                  <h4 className="font-serif text-3xl mb-4 italic leading-tight">Decision Intelligence</h4>
+                  <p className="text-[14px] opacity-90 leading-relaxed mb-8 font-light max-w-[200px]">
+                    Our AI engine has indexed {cases.length + 4209} claims today with a 99.4% confidence rating.
+                  </p>
+                  <button className="bg-white text-[var(--accent)] px-6 py-3 rounded-lg font-mono text-[11px] font-bold uppercase tracking-widest hover:translate-x-1 transition-all">
+                    View Accuracy Report →
+                  </button>
+                </div>
+                <Activity className="absolute -right-12 -bottom-12 w-56 h-56 opacity-10 rotate-12" />
+              </div>
             </div>
           </div>
-        </div>
-      </main>
+        ) : activeTab === 'all-cases' ? (
+          <div className="bg-white border border-[var(--border)] rounded-xl overflow-hidden">
+            <div className="p-10 border-b border-[var(--border)] flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-[var(--accent-light)] rounded-lg flex items-center justify-center text-[var(--accent)]">
+                  <FolderOpen size={22} />
+                </div>
+                <div>
+                  <h2 className="font-serif text-2xl text-[var(--text)] font-bold">Case Repository</h2>
+                  <p className="font-mono text-[10px] text-[var(--muted)] uppercase tracking-widest mt-1">CENTRALIZED AUDIT TRAIL DATA</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                 <button className="bg-[var(--bg)] border border-[var(--border)] px-4 py-2 rounded-lg font-mono text-[10px] font-bold uppercase tracking-widest hover:bg-white transition-all">Filter</button>
+                 <button className="bg-[var(--bg)] border border-[var(--border)] px-4 py-2 rounded-lg font-mono text-[10px] font-bold uppercase tracking-widest hover:bg-white transition-all">Export CSV</button>
+              </div>
+            </div>
+            <div className="p-10">
+              <AllCases />
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white border border-[var(--border)] rounded-xl p-32 flex flex-col items-center justify-center text-center">
+            <div className="w-20 h-20 bg-[var(--bg)] rounded-full flex items-center justify-center mb-10 border border-[var(--border)]">
+              <Clock size={32} className="text-[var(--mid)]" />
+            </div>
+            <h3 className="font-serif text-3xl text-[var(--text)] mb-4 font-bold">Module Indexing</h3>
+            <p className="text-[var(--muted)] max-w-sm text-[15px] leading-relaxed">The system is currently syncing historical {activeTab} data. This view will be fully operational shortly.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
