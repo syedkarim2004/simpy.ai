@@ -13,7 +13,7 @@ export default function PreauthLogin() {
     localStorage.setItem('simpy_token', 'mock_token');
     localStorage.setItem('simpy_user', JSON.stringify({ name: 'Demo Clinician', email, role: 'clinician' }));
     localStorage.setItem('simpy_portal', 'preauth');
-    navigate('/preauth/dashboard');
+    navigate('/app/preauth');
   };
 
   return (

@@ -123,7 +123,7 @@ export default function Landing() {
               title: "Pre-Auth Audit System",
               desc: "AI validation for insurance approvals. Ensuring clinical necessity before service delivery.",
               icon: ShieldCheck,
-              path: "/app/preauth",
+              path: "/preauth/login",
               delay: 0.1
             },
             {
@@ -137,7 +137,7 @@ export default function Landing() {
               title: "Admin Dashboard",
               desc: "Final settlement auditing and institutional reports. Complete financial-clinical reconciliation.",
               icon: Lock,
-              path: "/admin",
+              path: "/admin/login",
               delay: 0.3
             }
           ].map((portal, i) => (

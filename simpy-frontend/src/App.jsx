@@ -65,6 +65,7 @@ function App() {
         <Route path="/admin" element={<AdminPortal />} />
         <Route path="/medical/login" element={<MedicalLogin />} />
         <Route path="/medical/dashboard" element={<MedicalDashboard />} />
+        <Route path="/preauth/login" element={<PreauthLogin />} />
         <Route path="/admin/login" element={<AdminLogin />} />
 
         <Route
